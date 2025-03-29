@@ -1,29 +1,46 @@
+// main.dart
 import 'package:flutter/material.dart';
-// import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
-import 'package:pos/screens/transaksi_screen.dart';
-import 'package:pos/screens/produk_screen.dart';
-import 'package:pos/screens/hutang_screen.dart';
-import 'package:pos/screens/analisis_screen.dart';
-import 'package:pos/screens/supplier_screen.dart';
-import 'package:pos/screens/dashboard_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/transaksi_screen.dart';
+import 'screens/produk_screen.dart';
+import 'screens/hutang_screen.dart';
+import 'screens/supplier_screen.dart';
+import 'components/bottom_navbar.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() => runApp(MyApp());
+
+class MyApp extends StatefulWidget {
+  @override
+  State<MyApp> createState() => _MyAppState();
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class _MyAppState extends State<MyApp> {
+  int _selectedIndex = 0;
+  
+  final List<Widget> _screens = [
+    DashboardScreen(),
+    TransaksiScreen(),
+    ProdukScreen(),
+    HutangScreen(),
+    SupplierScreen(),
+  ];
 
-  // This widget is the root of your application.
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      home: Scaffold(
+        body: _screens[_selectedIndex],
+        bottomNavigationBar: CustomBottomNavBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+        ),
       ),
-      home: const DashboardScreen(),
     );
   }
 }

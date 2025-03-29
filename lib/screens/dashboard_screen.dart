@@ -70,51 +70,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Stok Rendah
             const Text(
               'Stok Hampir Habis',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Expanded(
-              child: _LowStockList(items: _lowStockProducts),
-            ),
-            
-            // Quick Actions
-            const SizedBox(height: 24),
-            const Text(
-              'Quick Actions',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            GridView.count(
-              shrinkWrap: true,
-              crossAxisCount: 3,
-              childAspectRatio: 1.5,
-              children: [
-                _QuickActionButton(
-                  icon: Icons.add_box,
-                  label: 'Tambah Produk',
-                  onTap: () => _navigateToProductScreen(),
-                ),
-                _QuickActionButton(
-                  icon: Icons.money_off,
-                  label: 'Catat Hutang',
-                  onTap: () => _navigateToDebtScreen(),
-                ),
-                _QuickActionButton(
-                  icon: Icons.point_of_sale,
-                  label: 'Transaksi Baru',
-                  onTap: () => _navigateToTransactionScreen(),
-                ),
-                _QuickActionButton( // Tombol baru untuk Supplier
-                  icon: Icons.local_shipping,
-                  label: 'Kelola Supplier',
-                  onTap: () => _navigateToSupplierScreen(),
-                ),
-              ],
-            ),
+            Expanded(child: _LowStockList(items: _lowStockProducts)),
           ],
         ),
       ),
@@ -149,6 +112,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
+
 // Custom Widget: Kartu Metrik
 class _MetricCard extends StatelessWidget {
   final String title;
@@ -173,10 +137,7 @@ class _MetricCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black54,
-                ),
+                style: const TextStyle(fontSize: 14, color: Colors.black54),
               ),
               const SizedBox(height: 8),
               Text(
