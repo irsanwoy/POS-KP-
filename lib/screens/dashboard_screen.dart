@@ -4,7 +4,6 @@ import 'package:pos/screens/hutang_screen.dart';
 import 'package:pos/screens/produk_screen.dart';
 import 'package:pos/screens/transaksi_screen.dart';
 import 'package:pos/screens/supplier_screen.dart';
-
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -101,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _navigateToTransactionScreen() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const TransaksiScreen()),
+      MaterialPageRoute(builder: (context) => TransaksiScreen()),
     );
   }
 

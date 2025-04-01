@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pos/db/database_helper.dart';
+import 'package:pos/models/product_model.dart';
 
 class ProdukScreen extends StatefulWidget {
   const ProdukScreen({super.key});
@@ -19,45 +21,43 @@ class _ProdukScreenState extends State<ProdukScreen> {
   }
 
   Future<void> _loadProducts() async {
-    final dummyProducts = [
-      Product(
-        id: 1,
-        name: 'Indomie Goreng',
-        barcode: '8998866103006',
-        hargaEceran: 3500,
-        hargaGrosir: 3000,
-        stock: 25,
-      ),
-      Product(
-        id: 2,
-        name: 'Aqua 600ml',
-        barcode: '8999999024779',
-        hargaEceran: 5000,
-        hargaGrosir: 4500,
-        stock: 50,
-      ),
-    ];
-    
-    setState(() {
-      _products = dummyProducts;
-      _filteredProducts = dummyProducts;
-    });
+    try {
+      final products = await DatabaseHelper().getAllProducts();
+      setState(() {
+        _products = products;
+        _filteredProducts = products;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat produk: $e'))
+      );
+    }
   }
 
   void _searchProducts(String query) {
     setState(() {
       _filteredProducts = _products.where((product) {
-        return product.name.toLowerCase().contains(query.toLowerCase()) ||
-            product.barcode.contains(query);
+        return product.namaProduk.toLowerCase().contains(query.toLowerCase()) ||
+            (product.barcode != null && product.barcode!.contains(query));
       }).toList();
     });
   }
 
-  void _deleteProduct(int id) {
-    setState(() {
-      _products.removeWhere((product) => product.id == id);
-      _filteredProducts = _products;
-    });
+  Future<void> _deleteProduct(int id) async {
+    try {
+      await DatabaseHelper().deleteProduct(id);
+      setState(() {
+        _products.removeWhere((product) => product.idProduk == id);
+        _filteredProducts = _products;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Produk berhasil dihapus'))
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus produk: $e'))
+      );
+    }
   }
 
   @override
@@ -65,27 +65,42 @@ class _ProdukScreenState extends State<ProdukScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kelola Produk'),
-        backgroundColor: Colors.deepOrange, // Vibrant app bar color
+        backgroundColor: Colors.deepOrange,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: ProductSearchDelegate(_products),
+              );
+            },
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView.builder(
-          itemCount: _filteredProducts.length,
-          itemBuilder: (context, index) {
-            final product = _filteredProducts[index];
-            return _ProductCard(
-              product: product,
-              onDelete: () => _deleteProduct(product.id!),
-            );
-          },
-        ),
-      ),
+      body: _filteredProducts.isEmpty
+          ? const Center(child: Text('Tidak ada produk'))
+          : ListView.builder(
+              itemCount: _filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = _filteredProducts[index];
+                return _ProductCard(
+                  product: product,
+                  onDelete: () => _deleteProduct(product.idProduk!),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ProductFormScreen()),
-        ),
-        backgroundColor: Colors.deepOrange, // Match FAB color to app bar
+        onPressed: () async {
+          final shouldRefresh = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ProductFormScreen()),
+          );
+          if (shouldRefresh == true) {
+            await _loadProducts();
+          }
+        },
+        backgroundColor: Colors.deepOrange,
         child: const Icon(Icons.add),
       ),
     );
@@ -104,24 +119,24 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      color: Colors.amber.shade100, // Colorful card background
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 2,
       child: ListTile(
         title: Text(
-          product.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+          product.namaProduk,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Barcode: ${product.barcode}', style: TextStyle(color: Colors.grey[700])),
-            Text('Eceran: Rp ${product.hargaEceran}', style: TextStyle(color: Colors.green[800])),
-            Text('Grosir: Rp ${product.hargaGrosir}', style: TextStyle(color: Colors.green[600])),
-            Text('Stok: ${product.stock}', style: TextStyle(color: Colors.red[700])),
+            if (product.barcode != null) 
+              Text('Barcode: ${product.barcode}'),
+            const SizedBox(height: 4),
+            Text('Harga Ecer: Rp ${product.hargaEcer.toStringAsFixed(2)}'),
+            if (product.hargaGrosir != null)
+              Text('Harga Grosir: Rp ${product.hargaGrosir!.toStringAsFixed(2)}'),
+            const SizedBox(height: 4),
+            Text('Stok: ${product.stok}'),
           ],
         ),
         trailing: Row(
@@ -129,21 +144,99 @@ class _ProductCard extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProductFormScreen(product: product),
-                ),
-              ),
+              onPressed: () async {
+                final shouldRefresh = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProductFormScreen(product: product),
+                  ),
+                );
+                if (shouldRefresh == true) {
+                  onDelete(); // Trigger reload
+                }
+              },
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: onDelete,
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Hapus Produk'),
+                    content: const Text('Apakah Anda yakin ingin menghapus produk ini?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Batal'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          onDelete();
+                        },
+                        child: const Text('Hapus'),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+class ProductSearchDelegate extends SearchDelegate {
+  final List<Product> products;
+
+  ProductSearchDelegate(this.products);
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, null);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final results = products.where((product) {
+      return product.namaProduk.toLowerCase().contains(query.toLowerCase()) ||
+          (product.barcode != null && product.barcode!.toLowerCase().contains(query.toLowerCase()));
+    }).toList();
+
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final product = results[index];
+        return _ProductCard(
+          product: product,
+          onDelete: () {}, // Handle delete jika diperlukan
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return buildResults(context);
   }
 }
 
@@ -168,11 +261,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void initState() {
     super.initState();
     if (widget.product != null) {
-      _nameController.text = widget.product!.name;
-      _barcodeController.text = widget.product!.barcode;
-      _hargaEceranController.text = widget.product!.hargaEceran.toString();
-      _hargaGrosirController.text = widget.product!.hargaGrosir.toString();
-      _stockController.text = widget.product!.stock.toString();
+      _nameController.text = widget.product!.namaProduk;
+      _barcodeController.text = widget.product!.barcode ?? '';
+      _hargaEceranController.text = widget.product!.hargaEcer.toString();
+      _hargaGrosirController.text = widget.product!.hargaGrosir?.toString() ?? '';
+      _stockController.text = widget.product!.stok.toString();
     }
   }
 
@@ -180,18 +273,33 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _barcodeController.text = DateTime.now().millisecondsSinceEpoch.toString();
   }
 
-  void _saveProduct() {
+  void _saveProduct() async {
     if (_formKey.currentState!.validate()) {
-      final newProduct = Product(
-        id: widget.product?.id,
-        name: _nameController.text,
-        barcode: _barcodeController.text,
-        hargaEceran: double.parse(_hargaEceranController.text),
-        hargaGrosir: double.parse(_hargaGrosirController.text),
-        stock: int.parse(_stockController.text),
-      );
+      try {
+        final newProduct = Product(
+          idProduk: widget.product?.idProduk,
+          namaProduk: _nameController.text,
+          hargaEcer: double.parse(_hargaEceranController.text),
+          hargaGrosir: _hargaGrosirController.text.isNotEmpty 
+              ? double.parse(_hargaGrosirController.text)
+              : null,
+          stok: int.parse(_stockController.text),
+          barcode: _barcodeController.text.isNotEmpty ? _barcodeController.text : null,
+          idSuplier: widget.product?.idSuplier,
+        );
 
-      Navigator.pop(context);
+        if (newProduct.idProduk == null) {
+          await DatabaseHelper().insertProduct(newProduct);
+        } else {
+          await DatabaseHelper().updateProduct(newProduct);
+        }
+
+        Navigator.pop(context, true);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan produk: $e'))
+        );
+      }
     }
   }
 
@@ -200,7 +308,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.product == null ? 'Tambah Produk' : 'Edit Produk'),
-        backgroundColor: Colors.deepOrange, // Matching the theme color
+        backgroundColor: Colors.deepOrange,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -210,7 +318,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nama Produk'),
+                decoration: const InputDecoration(
+                  labelText: 'Nama Produk',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Nama produk wajib diisi';
@@ -218,12 +329,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
                       controller: _barcodeController,
-                      decoration: const InputDecoration(labelText: 'Barcode'),
+                      decoration: const InputDecoration(
+                        labelText: 'Barcode',
+                        border: OutlineInputBorder(),
+                      ),
                       readOnly: true,
                     ),
                   ),
@@ -233,44 +348,62 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _hargaEceranController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Harga Eceran'),
+                decoration: const InputDecoration(
+                  labelText: 'Harga Eceran',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Harga eceran wajib diisi';
                   }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _hargaGrosirController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Harga Grosir'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Harga grosir wajib diisi';
+                  if (double.tryParse(value) == null) {
+                    return 'Masukkan angka yang valid';
                   }
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _hargaGrosirController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Harga Grosir (opsional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _stockController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Stok Awal'),
+                decoration: const InputDecoration(
+                  labelText: 'Stok Awal',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Stok wajib diisi';
                   }
+                  if (int.tryParse(value) == null) {
+                    return 'Masukkan angka yang valid';
+                  }
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _saveProduct,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange), // Consistent button color
-                child: const Text('Simpan Produk'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepOrange,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'SIMPAN PRODUK',
+                  style: TextStyle(fontSize: 16),
+                ),
               ),
             ],
           ),
@@ -278,22 +411,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       ),
     );
   }
-}
 
-class Product {
-  int? id;
-  String name;
-  String barcode;
-  double hargaEceran;
-  double hargaGrosir;
-  int stock;
-
-  Product({
-    this.id,
-    required this.name,
-    required this.barcode,
-    required this.hargaEceran,
-    required this.hargaGrosir,
-    required this.stock,
-  });
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _barcodeController.dispose();
+    _hargaEceranController.dispose();
+    _hargaGrosirController.dispose();
+    _stockController.dispose();
+    super.dispose();
+  }
 }
