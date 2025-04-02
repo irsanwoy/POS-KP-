@@ -14,6 +14,16 @@ class _SupplierScreenState extends State<SupplierScreen> {
   List<Supplier> _suppliers = [];
   List<Supplier> _filteredSuppliers = [];
   final TextEditingController _searchController = TextEditingController();
+  
+  // Controllers for editing or adding supplier
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _namaController = TextEditingController();
+  final TextEditingController _kontakController = TextEditingController();
+  final TextEditingController _alamatController = TextEditingController();
+  
+  // Variables to track whether it's add or edit
+  bool isEditMode = false;
+  Supplier? currentSupplier;
 
   @override
   void initState() {
@@ -62,11 +72,51 @@ class _SupplierScreenState extends State<SupplierScreen> {
     }
   }
 
+  void _saveSupplier() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        final newSupplier = Supplier(
+          idSuplier: currentSupplier?.idSuplier,
+          namaSuplier: _namaController.text,
+          kontak: _kontakController.text.isNotEmpty ? _kontakController.text : null,
+          alamat: _alamatController.text.isNotEmpty ? _alamatController.text : null,
+        );
+
+        if (newSupplier.idSuplier == null) {
+          await _dbHelper.insertSupplier(newSupplier);
+        } else {
+          await _dbHelper.updateSupplier(newSupplier);
+        }
+
+        // Reset the form and load updated data
+        setState(() {
+          isEditMode = false;
+          currentSupplier = null;
+        });
+        await _loadSuppliers();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan supplier: $e')),
+        );
+      }
+    }
+  }
+
+  void _editSupplier(Supplier supplier) {
+    setState(() {
+      isEditMode = true;
+      currentSupplier = supplier;
+      _namaController.text = supplier.namaSuplier;
+      _kontakController.text = supplier.kontak ?? '';
+      _alamatController.text = supplier.alamat ?? '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manajemen Supplier'),
+        title: Text(isEditMode ? 'Edit Supplier' : 'Manajemen Supplier'),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
@@ -80,31 +130,111 @@ class _SupplierScreenState extends State<SupplierScreen> {
           ),
         ],
       ),
-      body: _filteredSuppliers.isEmpty
-          ? const Center(child: Text('Tidak ada supplier'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredSuppliers.length,
-              itemBuilder: (context, index) {
-                final supplier = _filteredSuppliers[index];
-                return _SupplierCard(
-                  supplier: supplier,
-                  onDelete: () => _deleteSupplier(supplier.idSuplier!),
-                );
+      body: isEditMode
+          ? _buildForm() // Show the form if in edit mode
+          : _buildSupplierList(), // Otherwise, show the supplier list
+      floatingActionButton: isEditMode
+          ? null // Hide the FAB while editing
+          : FloatingActionButton(
+              onPressed: () {
+                setState(() {
+                  isEditMode = true;
+                });
+              },
+              backgroundColor: Colors.orange,
+              child: const Icon(Icons.add),
+            ),
+    );
+  }
+
+  Widget _buildSupplierList() {
+    return _filteredSuppliers.isEmpty
+        ? const Center(child: Text('Tidak ada supplier'))
+        : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _filteredSuppliers.length,
+            itemBuilder: (context, index) {
+              final supplier = _filteredSuppliers[index];
+              return _SupplierCard(
+                supplier: supplier,
+                onDelete: () => _deleteSupplier(supplier.idSuplier!),
+                onEdit: () => _editSupplier(supplier),
+              );
+            },
+          );
+  }
+
+  Widget _buildForm() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Form(
+        key: _formKey,
+        child: ListView(
+          children: [
+            TextFormField(
+              controller: _namaController,
+              decoration: const InputDecoration(
+                labelText: 'Nama Supplier',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Nama supplier wajib diisi';
+                }
+                return null;
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final shouldRefresh = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SupplierFormScreen()),
-          );
-          if (shouldRefresh == true) {
-            await _loadSuppliers();
-          }
-        },
-        backgroundColor: Colors.orange,
-        child: const Icon(Icons.add),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _kontakController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Kontak',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _alamatController,
+              decoration: const InputDecoration(
+                labelText: 'Alamat',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _saveSupplier,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text(
+                'SIMPAN SUPPLIER',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  isEditMode = false;
+                  currentSupplier = null;
+                  _namaController.clear();
+                  _kontakController.clear();
+                  _alamatController.clear();
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text(
+                'BATAL',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -113,10 +243,12 @@ class _SupplierScreenState extends State<SupplierScreen> {
 class _SupplierCard extends StatelessWidget {
   final Supplier supplier;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   const _SupplierCard({
     required this.supplier,
     required this.onDelete,
+    required this.onEdit,
   });
 
   @override
@@ -146,18 +278,7 @@ class _SupplierCard extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () async {
-                final shouldRefresh = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SupplierFormScreen(supplier: supplier),
-                  ),
-                );
-                if (shouldRefresh == true) {
-                  // Trigger reload
-                  Navigator.pop(context, true);
-                }
-              },
+              onPressed: onEdit,
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
@@ -210,6 +331,7 @@ class SupplierSearchDelegate extends SearchDelegate<Supplier> {
         return _SupplierCard(
           supplier: supplier,
           onDelete: () {}, // Handle delete if needed
+          onEdit: () {}, // Handle edit if needed
         );
       },
     );
@@ -218,126 +340,5 @@ class SupplierSearchDelegate extends SearchDelegate<Supplier> {
   @override
   Widget buildSuggestions(BuildContext context) {
     return buildResults(context);
-  }
-}
-
-class SupplierFormScreen extends StatefulWidget {
-  final Supplier? supplier;
-
-  const SupplierFormScreen({super.key, this.supplier});
-
-  @override
-  State<SupplierFormScreen> createState() => _SupplierFormScreenState();
-}
-
-class _SupplierFormScreenState extends State<SupplierFormScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _namaController = TextEditingController();
-  final TextEditingController _kontakController = TextEditingController();
-  final TextEditingController _alamatController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.supplier != null) {
-      _namaController.text = widget.supplier!.namaSuplier;
-      _kontakController.text = widget.supplier!.kontak ?? '';
-      _alamatController.text = widget.supplier!.alamat ?? '';
-    }
-  }
-
-  void _saveSupplier() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final newSupplier = Supplier(
-          idSuplier: widget.supplier?.idSuplier,
-          namaSuplier: _namaController.text,
-          kontak: _kontakController.text.isNotEmpty ? _kontakController.text : null,
-          alamat: _alamatController.text.isNotEmpty ? _alamatController.text : null,
-        );
-
-        if (newSupplier.idSuplier == null) {
-          await DatabaseHelper().insertSupplier(newSupplier);
-        } else {
-          await DatabaseHelper().updateSupplier(newSupplier);
-        }
-
-        Navigator.pop(context, true);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menyimpan supplier: $e')),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.supplier == null ? 'Tambah Supplier' : 'Edit Supplier'),
-        backgroundColor: Colors.teal,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _namaController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Supplier',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Nama supplier wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _kontakController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Kontak',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _alamatController,
-                decoration: const InputDecoration(
-                  labelText: 'Alamat',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _saveSupplier,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text(
-                  'SIMPAN SUPPLIER',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _namaController.dispose();
-    _kontakController.dispose();
-    _alamatController.dispose();
-    super.dispose();
   }
 }

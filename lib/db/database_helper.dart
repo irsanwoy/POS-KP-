@@ -232,7 +232,7 @@ class DatabaseHelper {
 
   Future<List<Transaction>> getTransactionsByDate(DateTime date) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+    final List<Map<String, dynamic>> maps = await db.rawQuery(''' 
       SELECT * FROM $tableTransaksi 
       WHERE DATE(tanggal) = DATE(?)
     ''', [date.toIso8601String()]);
@@ -278,10 +278,12 @@ class DatabaseHelper {
   Future<int> insertDebt(Debt debt) async {
     final db = await database;
     try {
-      return await db.insert(tableHutang, debt.toMap());
+      // Insert debt record into the database
+      final result = await db.insert(tableHutang, debt.toMap());
+      return result; // Return the id of the inserted record
     } catch (e) {
       print("Error inserting debt: $e");
-      return -1;
+      return -1; // Return -1 if error occurs
     }
   }
 
@@ -292,26 +294,44 @@ class DatabaseHelper {
       where: 'status = ?',
       whereArgs: ['belum lunas'],
     );
+
+    if (maps.isEmpty) {
+      print("No unpaid debts found");
+    }
+
+    // Map the query result to a list of Debt objects
     return maps.map((map) => Debt.fromMap(map)).toList();
   }
 
   Future<int> updateDebtStatus(int debtId, String newStatus) async {
     final db = await database;
-    return await db.update(
-      tableHutang,
-      {'status': newStatus},
-      where: 'id_hutang = ?',
-      whereArgs: [debtId],
-    );
+    try {
+      final result = await db.update(
+        tableHutang,
+        {'status': newStatus},
+        where: 'id_hutang = ?',
+        whereArgs: [debtId],
+      );
+      return result; // Return the number of rows affected
+    } catch (e) {
+      print("Error updating debt status: $e");
+      return -1; // Return -1 if error occurs
+    }
   }
 
   Future<int> deleteDebt(int debtId) async {
     final db = await database;
-    return await db.delete(
-      tableHutang,
-      where: 'id_hutang = ?',
-      whereArgs: [debtId],
-    );
+    try {
+      final result = await db.delete(
+        tableHutang,
+        where: 'id_hutang = ?',
+        whereArgs: [debtId],
+      );
+      return result; // Return the number of rows affected
+    } catch (e) {
+      print("Error deleting debt: $e");
+      return -1; // Return -1 if error occurs
+    }
   }
 
   // ========== STOCK ENTRY CRUD ==========

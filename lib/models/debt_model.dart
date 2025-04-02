@@ -1,10 +1,10 @@
 class Debt {
   int? idHutang;
-  final int? idTransaksi;
-  final String namaPelanggan;
-  final double totalHutang;
-  String status; // 'lunas' atau 'belum lunas'
-  final DateTime? tanggalJatuhTempo;
+  int? idTransaksi;
+  String namaPelanggan;
+  double totalHutang;
+  String status;
+  DateTime? tanggalJatuhTempo;
 
   Debt({
     this.idHutang,
@@ -15,19 +15,7 @@ class Debt {
     this.tanggalJatuhTempo,
   });
 
-  factory Debt.fromMap(Map<String, dynamic> map) {
-    return Debt(
-      idHutang: map['id_hutang'],
-      idTransaksi: map['id_transaksi'],
-      namaPelanggan: map['nama_pelanggan'],
-      totalHutang: map['total_hutang'],
-      status: map['status'],
-      tanggalJatuhTempo: map['tanggal_jatuh_tempo'] != null 
-          ? DateTime.parse(map['tanggal_jatuh_tempo']) 
-          : null,
-    );
-  }
-
+  // Convert Debt object to a Map (for database insert)
   Map<String, dynamic> toMap() {
     return {
       'id_hutang': idHutang,
@@ -37,5 +25,19 @@ class Debt {
       'status': status,
       'tanggal_jatuh_tempo': tanggalJatuhTempo?.toIso8601String(),
     };
+  }
+
+  // Convert Map to a Debt object
+  factory Debt.fromMap(Map<String, dynamic> map) {
+    return Debt(
+      idHutang: map['id_hutang'],
+      idTransaksi: map['id_transaksi'],
+      namaPelanggan: map['nama_pelanggan'],
+      totalHutang: map['total_hutang'],
+      status: map['status'],
+      tanggalJatuhTempo: map['tanggal_jatuh_tempo'] != null
+          ? DateTime.parse(map['tanggal_jatuh_tempo'])
+          : null,
+    );
   }
 }
