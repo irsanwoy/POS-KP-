@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:pos/db/database_helper.dart';
 import 'package:pos/models/transaction_model.dart';
 
@@ -15,17 +15,13 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   double _payment = 0.0;
   double _change = 0.0;
 
-  Future<void> _scanBarcode() async {
-    String barcode = await FlutterBarcodeScanner.scanBarcode(
-      '#FF0000', 
-      'Cancel', 
-      true, 
-      ScanMode.BARCODE
-    );
+  // Controller untuk MobileScanner
+  final MobileScannerController _scannerController = MobileScannerController();
 
-    if (barcode != '-1') {
-      _addProductToCart(barcode);
-    }
+  @override
+  void dispose() {
+    _scannerController.dispose();
+    super.dispose();
   }
 
   Future<void> _addProductToCart(String barcode) async {
@@ -40,7 +36,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
             break;
           }
         }
-        
+
         if (!exists) {
           _cartItems.add({
             'id': product.idProduk,
@@ -49,7 +45,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
             'quantity': 1,
           });
         }
-        
+
         _calculateTotal();
       });
     } else {
@@ -75,14 +71,14 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
 
     await _dbHelper.insertTransaction(
-  Transaction(
-    tanggal: DateTime.now(),
-    totalHarga: _total,
-    metodeBayar: _payment >= _total ? 'tunai' : 'hutang',
-    statusBayar: _payment >= _total ? 'lunas' : 'hutang',
-    // Sesuaikan dengan constructor Transaction Anda
-  )
-);
+      Transaction(
+        tanggal: DateTime.now(),
+        totalHarga: _total,
+        metodeBayar: _payment >= _total ? 'tunai' : 'non-tunai',
+        statusBayar: _payment >= _total ? 'lunas' : 'hutang',
+        // Sesuaikan dengan constructor Transaction Anda
+      )
+    );
 
     setState(() {
       _cartItems.clear();
@@ -104,7 +100,20 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.qr_code_scanner),
-            onPressed: _scanBarcode,
+            onPressed: () {
+              // Buka halaman pemindaian barcode
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BarcodeScannerPage(
+                    onScanResult: (barcode) {
+                      _addProductToCart(barcode);
+                      Navigator.pop(context); // Kembali ke halaman transaksi
+                    },
+                  ),
+                ),
+              );
+            },
           )
         ],
       ),
@@ -204,6 +213,33 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+// Halaman pemindaian barcode
+class BarcodeScannerPage extends StatelessWidget {
+  final Function(String) onScanResult;
+
+  const BarcodeScannerPage({required this.onScanResult});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Pindai Barcode'),
+      ),
+      body: Center(
+        child: MobileScanner(
+          fit: BoxFit.contain,
+          controller: MobileScannerController(),
+          onDetect: (capture) {
+            // Ambil barcode pertama dari daftar barcodes
+            final Barcode barcode = capture.barcodes.first;
+            onScanResult(barcode.rawValue ?? '');
+          },
+        ),
+      ),
     );
   }
 }

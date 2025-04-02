@@ -28,18 +28,21 @@ class _ProdukScreenState extends State<ProdukScreen> {
         _filteredProducts = products;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat produk: $e'))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memuat produk: $e')));
     }
   }
 
   void _searchProducts(String query) {
     setState(() {
-      _filteredProducts = _products.where((product) {
-        return product.namaProduk.toLowerCase().contains(query.toLowerCase()) ||
-            (product.barcode != null && product.barcode!.contains(query));
-      }).toList();
+      _filteredProducts =
+          _products.where((product) {
+            return product.namaProduk.toLowerCase().contains(
+                  query.toLowerCase(),
+                ) ||
+                (product.barcode != null && product.barcode!.contains(query));
+          }).toList();
     });
   }
 
@@ -50,13 +53,13 @@ class _ProdukScreenState extends State<ProdukScreen> {
         _products.removeWhere((product) => product.idProduk == id);
         _filteredProducts = _products;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Produk berhasil dihapus'))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Produk berhasil dihapus')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus produk: $e'))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal menghapus produk: $e')));
     }
   }
 
@@ -78,18 +81,19 @@ class _ProdukScreenState extends State<ProdukScreen> {
           ),
         ],
       ),
-      body: _filteredProducts.isEmpty
-          ? const Center(child: Text('Tidak ada produk'))
-          : ListView.builder(
-              itemCount: _filteredProducts.length,
-              itemBuilder: (context, index) {
-                final product = _filteredProducts[index];
-                return _ProductCard(
-                  product: product,
-                  onDelete: () => _deleteProduct(product.idProduk!),
-                );
-              },
-            ),
+      body:
+          _filteredProducts.isEmpty
+              ? const Center(child: Text('Tidak ada produk'))
+              : ListView.builder(
+                itemCount: _filteredProducts.length,
+                itemBuilder: (context, index) {
+                  final product = _filteredProducts[index];
+                  return _ProductCard(
+                    product: product,
+                    onDelete: () => _deleteProduct(product.idProduk!),
+                  );
+                },
+              ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final shouldRefresh = await Navigator.push(
@@ -111,10 +115,7 @@ class _ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback onDelete;
 
-  const _ProductCard({
-    required this.product,
-    required this.onDelete,
-  });
+  const _ProductCard({required this.product, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -129,12 +130,13 @@ class _ProductCard extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (product.barcode != null) 
-              Text('Barcode: ${product.barcode}'),
+            if (product.barcode != null) Text('Barcode: ${product.barcode}'),
             const SizedBox(height: 4),
             Text('Harga Ecer: Rp ${product.hargaEcer.toStringAsFixed(2)}'),
             if (product.hargaGrosir != null)
-              Text('Harga Grosir: Rp ${product.hargaGrosir!.toStringAsFixed(2)}'),
+              Text(
+                'Harga Grosir: Rp ${product.hargaGrosir!.toStringAsFixed(2)}',
+              ),
             const SizedBox(height: 4),
             Text('Stok: ${product.stok}'),
           ],
@@ -152,7 +154,7 @@ class _ProductCard extends StatelessWidget {
                   ),
                 );
                 if (shouldRefresh == true) {
-                  onDelete(); // Trigger reload
+                   shouldRefresh(); // Trigger reload
                 }
               },
             ),
@@ -161,23 +163,26 @@ class _ProductCard extends StatelessWidget {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Hapus Produk'),
-                    content: const Text('Apakah Anda yakin ingin menghapus produk ini?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Batal'),
+                  builder:
+                      (context) => AlertDialog(
+                        title: const Text('Hapus Produk'),
+                        content: const Text(
+                          'Apakah Anda yakin ingin menghapus produk ini?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Batal'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              onDelete();
+                            },
+                            child: const Text('Hapus'),
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          onDelete();
-                        },
-                        child: const Text('Hapus'),
-                      ),
-                    ],
-                  ),
                 );
               },
             ),
@@ -217,10 +222,14 @@ class ProductSearchDelegate extends SearchDelegate {
 
   @override
   Widget buildResults(BuildContext context) {
-    final results = products.where((product) {
-      return product.namaProduk.toLowerCase().contains(query.toLowerCase()) ||
-          (product.barcode != null && product.barcode!.toLowerCase().contains(query.toLowerCase()));
-    }).toList();
+    final results =
+        products.where((product) {
+          return product.namaProduk.toLowerCase().contains(
+                query.toLowerCase(),
+              ) ||
+              (product.barcode != null &&
+                  product.barcode!.toLowerCase().contains(query.toLowerCase()));
+        }).toList();
 
     return ListView.builder(
       itemCount: results.length,
@@ -264,7 +273,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _nameController.text = widget.product!.namaProduk;
       _barcodeController.text = widget.product!.barcode ?? '';
       _hargaEceranController.text = widget.product!.hargaEcer.toString();
-      _hargaGrosirController.text = widget.product!.hargaGrosir?.toString() ?? '';
+      _hargaGrosirController.text =
+          widget.product!.hargaGrosir?.toString() ?? '';
       _stockController.text = widget.product!.stok.toString();
     }
   }
@@ -280,11 +290,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           idProduk: widget.product?.idProduk,
           namaProduk: _nameController.text,
           hargaEcer: double.parse(_hargaEceranController.text),
-          hargaGrosir: _hargaGrosirController.text.isNotEmpty 
-              ? double.parse(_hargaGrosirController.text)
-              : null,
+          hargaGrosir:
+              _hargaGrosirController.text.isNotEmpty
+                  ? double.parse(_hargaGrosirController.text)
+                  : null,
           stok: int.parse(_stockController.text),
-          barcode: _barcodeController.text.isNotEmpty ? _barcodeController.text : null,
+          barcode:
+              _barcodeController.text.isNotEmpty
+                  ? _barcodeController.text
+                  : null,
           idSuplier: widget.product?.idSuplier,
         );
 
@@ -296,9 +310,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
         Navigator.pop(context, true);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menyimpan produk: $e'))
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal menyimpan produk: $e')));
       }
     }
   }

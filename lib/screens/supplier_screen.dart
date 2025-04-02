@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pos/db/database_helper.dart';
+import 'package:pos/models/supplier_model.dart';
 
 class SupplierScreen extends StatefulWidget {
   const SupplierScreen({super.key});
@@ -8,6 +10,7 @@ class SupplierScreen extends StatefulWidget {
 }
 
 class _SupplierScreenState extends State<SupplierScreen> {
+  final DatabaseHelper _dbHelper = DatabaseHelper();
   List<Supplier> _suppliers = [];
   List<Supplier> _filteredSuppliers = [];
   final TextEditingController _searchController = TextEditingController();
@@ -19,82 +22,89 @@ class _SupplierScreenState extends State<SupplierScreen> {
   }
 
   Future<void> _loadSuppliers() async {
-    final dummySuppliers = [
-      Supplier(
-        id: 1,
-        nama: 'PT. Sumber Makmur',
-        kontak: '0812-3456-7890',
-        alamat: 'Jl. Raya No. 123, Jakarta',
-      ),
-      Supplier(
-        id: 2,
-        nama: 'CV. Sejahtera Abadi',
-        kontak: '0813-4567-8901',
-        alamat: 'Jl. Merdeka No. 45, Bandung',
-      ),
-    ];
-
-    setState(() {
-      _suppliers = dummySuppliers;
-      _filteredSuppliers = dummySuppliers;
-    });
+    try {
+      final suppliers = await _dbHelper.getAllSuppliers();
+      setState(() {
+        _suppliers = suppliers;
+        _filteredSuppliers = suppliers;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat supplier: $e')),
+      );
+    }
   }
 
   void _searchSuppliers(String query) {
     setState(() {
       _filteredSuppliers = _suppliers.where((supplier) {
-        return supplier.nama.toLowerCase().contains(query.toLowerCase()) ||
-            supplier.kontak.contains(query) ||
-            supplier.alamat.toLowerCase().contains(query.toLowerCase());
+        return supplier.namaSuplier.toLowerCase().contains(query.toLowerCase()) ||
+            (supplier.kontak != null && supplier.kontak!.contains(query)) ||
+            (supplier.alamat != null && supplier.alamat!.toLowerCase().contains(query.toLowerCase()));
       }).toList();
     });
   }
 
-  void _deleteSupplier(int id) {
-    setState(() {
-      _suppliers.removeWhere((supplier) => supplier.id == id);
-      _filteredSuppliers = _suppliers;
-    });
+  Future<void> _deleteSupplier(int idSuplier) async {
+    try {
+      await _dbHelper.deleteSupplier(idSuplier);
+      setState(() {
+        _suppliers.removeWhere((supplier) => supplier.idSuplier == idSuplier);
+        _filteredSuppliers = _suppliers;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Supplier berhasil dihapus')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus supplier: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.teal, // Warna yang lebih cerah pada AppBar
-        title: const Text('Manajemen Supplier', style: TextStyle(color: Colors.white)),
+        title: const Text('Manajemen Supplier'),
+        backgroundColor: Colors.teal,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
               showSearch(
                 context: context,
-                delegate: SupplierSearchDelegate(suppliers: _suppliers),
+                delegate: SupplierSearchDelegate(_suppliers),
               );
             },
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView.builder(
-          itemCount: _filteredSuppliers.length,
-          itemBuilder: (context, index) {
-            final supplier = _filteredSuppliers[index];
-            return _SupplierCard(
-              supplier: supplier,
-              onDelete: () => _deleteSupplier(supplier.id!),
-            );
-          },
-        ),
-      ),
+      body: _filteredSuppliers.isEmpty
+          ? const Center(child: Text('Tidak ada supplier'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _filteredSuppliers.length,
+              itemBuilder: (context, index) {
+                final supplier = _filteredSuppliers[index];
+                return _SupplierCard(
+                  supplier: supplier,
+                  onDelete: () => _deleteSupplier(supplier.idSuplier!),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SupplierFormScreen()),
-        ),
+        onPressed: () async {
+          final shouldRefresh = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SupplierFormScreen()),
+          );
+          if (shouldRefresh == true) {
+            await _loadSuppliers();
+          }
+        },
+        backgroundColor: Colors.orange,
         child: const Icon(Icons.add),
-        backgroundColor: Colors.orange, // Warna tombol yang cerah
       ),
     );
   }
@@ -112,21 +122,23 @@ class _SupplierCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 4, // Menambahkan bayangan pada card
+      elevation: 4,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12), // Sudut card lebih melengkung
+        borderRadius: BorderRadius.circular(12),
       ),
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListTile(
         title: Text(
-          supplier.nama,
+          supplier.namaSuplier,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Kontak: ${supplier.kontak}', style: const TextStyle(color: Colors.grey)),
-            Text('Alamat: ${supplier.alamat}', style: const TextStyle(color: Colors.grey)),
+            if (supplier.kontak != null)
+              Text('Kontak: ${supplier.kontak}', style: const TextStyle(color: Colors.grey)),
+            if (supplier.alamat != null)
+              Text('Alamat: ${supplier.alamat}', style: const TextStyle(color: Colors.grey)),
           ],
         ),
         trailing: Row(
@@ -134,12 +146,18 @@ class _SupplierCard extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SupplierFormScreen(supplier: supplier),
-                ),
-              ),
+              onPressed: () async {
+                final shouldRefresh = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SupplierFormScreen(supplier: supplier),
+                  ),
+                );
+                if (shouldRefresh == true) {
+                  // Trigger reload
+                  Navigator.pop(context, true);
+                }
+              },
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
@@ -149,6 +167,57 @@ class _SupplierCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class SupplierSearchDelegate extends SearchDelegate<Supplier> {
+  final List<Supplier> suppliers;
+
+  SupplierSearchDelegate(this.suppliers);
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, Supplier(idSuplier: 0, namaSuplier: '', kontak: '', alamat: ''));
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final results = suppliers.where((supplier) {
+      return supplier.namaSuplier.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final supplier = results[index];
+        return _SupplierCard(
+          supplier: supplier,
+          onDelete: () {}, // Handle delete if needed
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return buildResults(context);
   }
 }
 
@@ -171,22 +240,34 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
   void initState() {
     super.initState();
     if (widget.supplier != null) {
-      _namaController.text = widget.supplier!.nama;
-      _kontakController.text = widget.supplier!.kontak;
-      _alamatController.text = widget.supplier!.alamat;
+      _namaController.text = widget.supplier!.namaSuplier;
+      _kontakController.text = widget.supplier!.kontak ?? '';
+      _alamatController.text = widget.supplier!.alamat ?? '';
     }
   }
 
-  void _saveSupplier() {
+  void _saveSupplier() async {
     if (_formKey.currentState!.validate()) {
-      final newSupplier = Supplier(
-        id: widget.supplier?.id,
-        nama: _namaController.text,
-        kontak: _kontakController.text,
-        alamat: _alamatController.text,
-      );
+      try {
+        final newSupplier = Supplier(
+          idSuplier: widget.supplier?.idSuplier,
+          namaSuplier: _namaController.text,
+          kontak: _kontakController.text.isNotEmpty ? _kontakController.text : null,
+          alamat: _alamatController.text.isNotEmpty ? _alamatController.text : null,
+        );
 
-      Navigator.pop(context);
+        if (newSupplier.idSuplier == null) {
+          await DatabaseHelper().insertSupplier(newSupplier);
+        } else {
+          await DatabaseHelper().updateSupplier(newSupplier);
+        }
+
+        Navigator.pop(context, true);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan supplier: $e')),
+        );
+      }
     }
   }
 
@@ -207,12 +288,7 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
                 controller: _namaController,
                 decoration: const InputDecoration(
                   labelText: 'Nama Supplier',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -221,55 +297,33 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _kontakController,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: 'Kontak',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Kontak wajib diisi';
-                  }
-                  return null;
-                },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _alamatController,
                 decoration: const InputDecoration(
                   labelText: 'Alamat',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Alamat wajib diisi';
-                  }
-                  return null;
-                },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _saveSupplier,
-                child: const Text('Simpan Supplier'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal, // Warna tombol yang konsisten
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor: Colors.teal,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'SIMPAN SUPPLIER',
+                  style: TextStyle(fontSize: 16),
                 ),
               ),
             ],
@@ -278,78 +332,12 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
       ),
     );
   }
-}
-
-class Supplier {
-  int? id;
-  String nama;
-  String kontak;
-  String alamat;
-
-  Supplier({
-    this.id,
-    required this.nama,
-    required this.kontak,
-    required this.alamat,
-  });
-}
-
-class SupplierSearchDelegate extends SearchDelegate<Supplier> {
-  final List<Supplier> suppliers;
-
-  SupplierSearchDelegate({required this.suppliers});
 
   @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, Supplier(id: 0, nama: '', kontak: '', alamat: ''));
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    final results = suppliers.where((supplier) {
-      return supplier.nama.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    return ListView(
-      children: results.map((supplier) {
-        return ListTile(
-          title: Text(supplier.nama),
-          subtitle: Text(supplier.kontak),
-        );
-      }).toList(),
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    final suggestions = suppliers.where((supplier) {
-      return supplier.nama.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    return ListView(
-      children: suggestions.map((supplier) {
-        return ListTile(
-          title: Text(supplier.nama),
-          subtitle: Text(supplier.kontak),
-        );
-      }).toList(),
-    );
+  void dispose() {
+    _namaController.dispose();
+    _kontakController.dispose();
+    _alamatController.dispose();
+    super.dispose();
   }
 }

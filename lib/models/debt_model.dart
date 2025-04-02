@@ -1,9 +1,9 @@
 class Debt {
-  final int? idHutang;
+  int? idHutang;
   final int? idTransaksi;
   final String namaPelanggan;
   final double totalHutang;
-  final String status; // 'lunas' atau 'belum lunas'
+  String status; // 'lunas' atau 'belum lunas'
   final DateTime? tanggalJatuhTempo;
 
   Debt({

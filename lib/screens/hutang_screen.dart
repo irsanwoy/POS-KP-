@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pos/db/database_helper.dart';
+import 'package:pos/models/debt_model.dart';
 
 class HutangScreen extends StatefulWidget {
   const HutangScreen({super.key});
@@ -8,8 +10,9 @@ class HutangScreen extends StatefulWidget {
 }
 
 class _HutangScreenState extends State<HutangScreen> {
-  List<Hutang> _hutangList = [];
-  List<Hutang> _filteredHutangList = [];
+  final DatabaseHelper _dbHelper = DatabaseHelper();
+  List<Debt> _hutangList = [];
+  List<Debt> _filteredHutangList = [];
   final TextEditingController _searchController = TextEditingController();
   bool _showLunasOnly = false;
 
@@ -20,37 +23,23 @@ class _HutangScreenState extends State<HutangScreen> {
   }
 
   Future<void> _loadHutang() async {
-    final dummyHutang = [
-      Hutang(
-        id: 1,
-        namaPelanggan: 'John Doe',
-        jumlahHutang: 500000,
-        tanggalHutang: DateTime(2024, 1, 15),
-        jatuhTempo: DateTime(2024, 2, 15),
-        isLunas: false,
-      ),
-      Hutang(
-        id: 2,
-        namaPelanggan: 'Jane Smith',
-        jumlahHutang: 750000,
-        tanggalHutang: DateTime(2024, 1, 20),
-        jatuhTempo: DateTime(2024, 2, 20),
-        isLunas: true,
-      ),
-    ];
-
-    setState(() {
-      _hutangList = dummyHutang;
-      _filteredHutangList = dummyHutang;
-    });
+    try {
+      final debts = await _dbHelper.getUnpaidDebts(); // Ambil semua hutang yang belum lunas
+      setState(() {
+        _hutangList = debts;
+        _filteredHutangList = debts;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat hutang: $e')),
+      );
+    }
   }
 
-  void _filterHutang(String query) {
+  void _searchHutang(String query) {
     setState(() {
       _filteredHutangList = _hutangList.where((hutang) {
-        final matchNama = hutang.namaPelanggan.toLowerCase().contains(query.toLowerCase());
-        final matchStatus = _showLunasOnly ? hutang.isLunas : true;
-        return matchNama && matchStatus;
+        return hutang.namaPelanggan.toLowerCase().contains(query.toLowerCase());
       }).toList();
     });
   }
@@ -58,15 +47,34 @@ class _HutangScreenState extends State<HutangScreen> {
   void _toggleLunasOnly(bool value) {
     setState(() {
       _showLunasOnly = value;
-      _filterHutang(_searchController.text);
+      _filterHutang();
     });
   }
 
-  void _deleteHutang(int id) {
+  void _filterHutang() {
     setState(() {
-      _hutangList.removeWhere((hutang) => hutang.id == id);
-      _filteredHutangList = _hutangList;
+      _filteredHutangList = _hutangList.where((hutang) {
+        final matchStatus = _showLunasOnly ? hutang.status == 'lunas' : true;
+        return matchStatus;
+      }).toList();
     });
+  }
+
+  Future<void> _deleteHutang(int id) async {
+    try {
+      await _dbHelper.deleteDebt(id); // Hapus hutang dari database
+      setState(() {
+        _hutangList.removeWhere((hutang) => hutang.idHutang == id);
+        _filteredHutangList = _hutangList;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hutang berhasil dihapus')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus hutang: $e')),
+      );
+    }
   }
 
   @override
@@ -75,6 +83,17 @@ class _HutangScreenState extends State<HutangScreen> {
       appBar: AppBar(
         title: const Text('Pencatatan Hutang'),
         backgroundColor: Colors.teal,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: HutangSearchDelegate(_hutangList),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -96,25 +115,32 @@ class _HutangScreenState extends State<HutangScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredHutangList.length,
-              itemBuilder: (context, index) {
-                final hutang = _filteredHutangList[index];
-                return _HutangCard(
-                  hutang: hutang,
-                  onDelete: () => _deleteHutang(hutang.id!),
-                );
-              },
-            ),
+            child: _filteredHutangList.isEmpty
+                ? const Center(child: Text('Tidak ada hutang'))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredHutangList.length,
+                    itemBuilder: (context, index) {
+                      final hutang = _filteredHutangList[index];
+                      return _HutangCard(
+                        hutang: hutang,
+                        onDelete: () => _deleteHutang(hutang.idHutang!),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const HutangFormScreen()),
-        ),
+        onPressed: () async {
+          final shouldRefresh = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HutangFormScreen()),
+          );
+          if (shouldRefresh == true) {
+            await _loadHutang();
+          }
+        },
         backgroundColor: Colors.teal,
         child: const Icon(Icons.add),
       ),
@@ -123,7 +149,7 @@ class _HutangScreenState extends State<HutangScreen> {
 }
 
 class _HutangCard extends StatelessWidget {
-  final Hutang hutang;
+  final Debt hutang;
   final VoidCallback onDelete;
 
   const _HutangCard({
@@ -134,32 +160,29 @@ class _HutangCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 4,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      color: hutang.isLunas ? Colors.green[50] : Colors.red[50],
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 2,
+      color: hutang.status == 'lunas' ? Colors.green[50] : Colors.red[50],
       child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
         title: Text(
           hutang.namaPelanggan,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Jumlah: Rp ${hutang.jumlahHutang}', style: TextStyle(color: Colors.black)),
+            Text('Jumlah: Rp ${hutang.totalHutang.toStringAsFixed(2)}'),
+            if (hutang.tanggalJatuhTempo != null)
+              Text(
+                'Jatuh Tempo: ${hutang.tanggalJatuhTempo!.toLocal().toString().split(' ')[0]}',
+              ),
             Text(
-                'Tanggal Hutang: ${hutang.tanggalHutang.toLocal().toString().split(' ')[0]}',
-                style: TextStyle(color: Colors.black)),
-            Text(
-                'Jatuh Tempo: ${hutang.jatuhTempo.toLocal().toString().split(' ')[0]}',
-                style: TextStyle(color: Colors.black)),
-            Text(
-                'Status: ${hutang.isLunas ? 'Lunas' : 'Belum Lunas'}',
-                style: TextStyle(
-                    color: hutang.isLunas ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+              'Status: ${hutang.status == 'lunas' ? 'Lunas' : 'Belum Lunas'}',
+              style: TextStyle(
+                color: hutang.status == 'lunas' ? Colors.green : Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         trailing: Row(
@@ -167,16 +190,43 @@ class _HutangCard extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HutangFormScreen(hutang: hutang),
-                ),
-              ),
+              onPressed: () async {
+                final shouldRefresh = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HutangFormScreen(debt: hutang),
+                  ),
+                );
+                if (shouldRefresh == true) {
+                  // Refetch data after editing
+                  Navigator.pop(context, true);
+                }
+              },
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: onDelete,
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Hapus Hutang'),
+                    content: const Text('Apakah Anda yakin ingin menghapus hutang ini?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Batal'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          onDelete();
+                        },
+                        child: const Text('Hapus'),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -185,10 +235,61 @@ class _HutangCard extends StatelessWidget {
   }
 }
 
-class HutangFormScreen extends StatefulWidget {
-  final Hutang? hutang;
+class HutangSearchDelegate extends SearchDelegate {
+  final List<Debt> hutangList;
 
-  const HutangFormScreen({super.key, this.hutang});
+  HutangSearchDelegate(this.hutangList);
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, null);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final results = hutangList.where((hutang) {
+      return hutang.namaPelanggan.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final hutang = results[index];
+        return _HutangCard(
+          hutang: hutang,
+          onDelete: () {}, // Handle delete if needed
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return buildResults(context);
+  }
+}
+
+class HutangFormScreen extends StatefulWidget {
+  final Debt? debt;
+
+  const HutangFormScreen({super.key, this.debt});
 
   @override
   State<HutangFormScreen> createState() => _HutangFormScreenState();
@@ -197,24 +298,23 @@ class HutangFormScreen extends StatefulWidget {
 class _HutangFormScreenState extends State<HutangFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _namaPelangganController = TextEditingController();
-  final TextEditingController _jumlahHutangController = TextEditingController();
-  final TextEditingController _tanggalHutangController = TextEditingController();
-  final TextEditingController _jatuhTempoController = TextEditingController();
-  bool _isLunas = false;
+  final TextEditingController _totalHutangController = TextEditingController();
+  final TextEditingController _tanggalJatuhTempoController = TextEditingController();
+  String _status = 'belum lunas';
 
   @override
   void initState() {
     super.initState();
-    if (widget.hutang != null) {
-      _namaPelangganController.text = widget.hutang!.namaPelanggan;
-      _jumlahHutangController.text = widget.hutang!.jumlahHutang.toString();
-      _tanggalHutangController.text = widget.hutang!.tanggalHutang.toLocal().toString().split(' ')[0];
-      _jatuhTempoController.text = widget.hutang!.jatuhTempo.toLocal().toString().split(' ')[0];
-      _isLunas = widget.hutang!.isLunas;
+    if (widget.debt != null) {
+      _namaPelangganController.text = widget.debt!.namaPelanggan;
+      _totalHutangController.text = widget.debt!.totalHutang.toString();
+      _tanggalJatuhTempoController.text =
+          widget.debt!.tanggalJatuhTempo?.toLocal().toString().split(' ')[0] ?? '';
+      _status = widget.debt!.status;
     }
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -222,22 +322,35 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      controller.text = picked.toLocal().toString().split(' ')[0];
+      _tanggalJatuhTempoController.text = picked.toLocal().toString().split(' ')[0];
     }
   }
 
-  void _saveHutang() {
+  void _saveHutang() async {
     if (_formKey.currentState!.validate()) {
-      final newHutang = Hutang(
-        id: widget.hutang?.id,
-        namaPelanggan: _namaPelangganController.text,
-        jumlahHutang: double.parse(_jumlahHutangController.text),
-        tanggalHutang: DateTime.parse(_tanggalHutangController.text),
-        jatuhTempo: DateTime.parse(_jatuhTempoController.text),
-        isLunas: _isLunas,
-      );
+      try {
+        final newDebt = Debt(
+          idHutang: widget.debt?.idHutang,
+          namaPelanggan: _namaPelangganController.text,
+          totalHutang: double.parse(_totalHutangController.text),
+          status: _status,
+          tanggalJatuhTempo: _tanggalJatuhTempoController.text.isNotEmpty
+              ? DateTime.parse(_tanggalJatuhTempoController.text)
+              : null,
+        );
 
-      Navigator.pop(context);
+        if (newDebt.idHutang == null) {
+          await DatabaseHelper().insertDebt(newDebt);
+        } else {
+          await DatabaseHelper().updateDebtStatus(newDebt.idHutang!, _status);
+        }
+
+        Navigator.pop(context, true);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan hutang: $e')),
+        );
+      }
     }
   }
 
@@ -245,7 +358,7 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.hutang == null ? 'Tambah Hutang' : 'Edit Hutang'),
+        title: Text(widget.debt == null ? 'Tambah Hutang' : 'Edit Hutang'),
         backgroundColor: Colors.teal,
       ),
       body: Padding(
@@ -256,7 +369,10 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
             children: [
               TextFormField(
                 controller: _namaPelangganController,
-                decoration: const InputDecoration(labelText: 'Nama Pelanggan'),
+                decoration: const InputDecoration(
+                  labelText: 'Nama Pelanggan',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Nama pelanggan wajib diisi';
@@ -264,55 +380,70 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
               TextFormField(
-                controller: _jumlahHutangController,
+                controller: _totalHutangController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Jumlah Hutang'),
+                decoration: const InputDecoration(
+                  labelText: 'Total Hutang',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Jumlah hutang wajib diisi';
+                    return 'Total hutang wajib diisi';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Masukkan angka yang valid';
                   }
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
               TextFormField(
-                controller: _tanggalHutangController,
-                decoration: const InputDecoration(labelText: 'Tanggal Hutang'),
+                controller: _tanggalJatuhTempoController,
+                decoration: const InputDecoration(
+                  labelText: 'Tanggal Jatuh Tempo',
+                  border: OutlineInputBorder(),
+                ),
                 readOnly: true,
-                onTap: () => _selectDate(context, _tanggalHutangController),
+                onTap: () => _selectDate(context),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Tanggal hutang wajib diisi';
+                    return 'Tanggal jatuh tempo wajib diisi';
                   }
                   return null;
                 },
               ),
-              TextFormField(
-                controller: _jatuhTempoController,
-                decoration: const InputDecoration(labelText: 'Jatuh Tempo'),
-                readOnly: true,
-                onTap: () => _selectDate(context, _jatuhTempoController),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Jatuh tempo wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-              SwitchListTile(
-                title: const Text('Lunas'),
-                value: _isLunas,
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _status,
+                decoration: const InputDecoration(
+                  labelText: 'Status',
+                  border: OutlineInputBorder(),
+                ),
+                items: ['belum lunas', 'lunas']
+                    .map((status) => DropdownMenuItem(
+                          value: status,
+                          child: Text(status),
+                        ))
+                    .toList(),
                 onChanged: (value) {
                   setState(() {
-                    _isLunas = value;
+                    _status = value!;
                   });
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _saveHutang,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                child: const Text('Simpan Hutang'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'SIMPAN HUTANG',
+                  style: TextStyle(fontSize: 16),
+                ),
               ),
             ],
           ),
@@ -320,22 +451,12 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
       ),
     );
   }
-}
 
-class Hutang {
-  int? id;
-  String namaPelanggan;
-  double jumlahHutang;
-  DateTime tanggalHutang;
-  DateTime jatuhTempo;
-  bool isLunas;
-
-  Hutang({
-    this.id,
-    required this.namaPelanggan,
-    required this.jumlahHutang,
-    required this.tanggalHutang,
-    required this.jatuhTempo,
-    required this.isLunas,
-  });
+  @override
+  void dispose() {
+    _namaPelangganController.dispose();
+    _totalHutangController.dispose();
+    _tanggalJatuhTempoController.dispose();
+    super.dispose();
+  }
 }

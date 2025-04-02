@@ -40,6 +40,7 @@ dependencies:
   printing: ^5.11.1
   pdf: ^3.10.2
   syncfusion_flutter_charts: ^28.2.7
+  mobile_scanner: ^6.0.7
   # barcode_scanner: ^6.1.1
   # flutter_barcode_scanner: ^2.0.0
 
