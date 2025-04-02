@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:pos/db/database_helper.dart';
 import 'package:pos/models/transaction_model.dart';
+import 'package:pos/models/debt_model.dart';
 
 class TransaksiScreen extends StatefulWidget {
+  const TransaksiScreen({super.key});
+
   @override
-  _TransaksiScreenState createState() => _TransaksiScreenState();
+  State<TransaksiScreen> createState() => _TransaksiScreenState();
 }
 
 class _TransaksiScreenState extends State<TransaksiScreen> {
@@ -25,32 +28,38 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   }
 
   Future<void> _addProductToCart(String barcode) async {
-    final product = await _dbHelper.getProductByBarcode(barcode);
-    if (product != null) {
-      setState(() {
-        bool exists = false;
-        for (var item in _cartItems) {
-          if (item['id'] == product.idProduk) {
-            item['quantity'] += 1;
-            exists = true;
-            break;
+    try {
+      final product = await _dbHelper.getProductByBarcode(barcode);
+      if (product != null) {
+        setState(() {
+          bool exists = false;
+          for (var item in _cartItems) {
+            if (item['id'] == product.idProduk) {
+              item['quantity'] += 1;
+              exists = true;
+              break;
+            }
           }
-        }
 
-        if (!exists) {
-          _cartItems.add({
-            'id': product.idProduk,
-            'name': product.namaProduk,
-            'price': product.hargaEcer,
-            'quantity': 1,
-          });
-        }
+          if (!exists) {
+            _cartItems.add({
+              'id': product.idProduk,
+              'name': product.namaProduk,
+              'price': product.hargaEcer,
+              'quantity': 1,
+            });
+          }
 
-        _calculateTotal();
-      });
-    } else {
+          _calculateTotal();
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Produk tidak ditemukan')),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Produk tidak ditemukan'))
+        SnackBar(content: Text('Gagal memuat produk: $e')),
       );
     }
   }
@@ -65,41 +74,74 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   Future<void> _completeTransaction() async {
     if (_payment < _total) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pembayaran kurang'))
+        SnackBar(content: Text('Pembayaran kurang')),
       );
       return;
     }
 
-    await _dbHelper.insertTransaction(
-      Transaction(
-        tanggal: DateTime.now(),
-        totalHarga: _total,
-        metodeBayar: _payment >= _total ? 'tunai' : 'non-tunai',
-        statusBayar: _payment >= _total ? 'lunas' : 'hutang',
-        // Sesuaikan dengan constructor Transaction Anda
-      )
-    );
+    try {
+      // Simpan transaksi utama
+      final transactionId = await _dbHelper.insertTransaction(
+        Transaction(
+          tanggal: DateTime.now(),
+          totalHarga: _total,
+          metodeBayar: _payment >= _total ? 'tunai' : 'non-tunai',
+          statusBayar: _payment >= _total ? 'lunas' : 'hutang',
+        ),
+      );
 
-    setState(() {
-      _cartItems.clear();
-      _total = 0.0;
-      _payment = 0.0;
-      _change = 0.0;
-    });
+      // Simpan detail transaksi
+      for (var item in _cartItems) {
+        await _dbHelper.insertTransactionDetail(
+          TransactionDetail(
+            idTransaksi: transactionId,
+            idProduk: item['id'],
+            jumlah: item['quantity'],
+            hargaSatuan: item['price'],
+            subtotal: item['price'] * item['quantity'],
+          ),
+        );
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Transaksi berhasil'))
-    );
+      // Jika ada hutang, simpan ke tabel hutang_pelanggan
+      if (_payment < _total) {
+        await _dbHelper.insertDebt(
+          Debt(
+            idTransaksi: transactionId,
+            namaPelanggan: '', // Anda bisa menambahkan logika untuk mendapatkan nama pelanggan
+            totalHutang: _total - _payment,
+            status: 'belum lunas',
+            tanggalJatuhTempo: DateTime.now().add(const Duration(days: 7)), // Contoh jatuh tempo dalam 7 hari
+          ),
+        );
+      }
+
+      setState(() {
+        _cartItems.clear();
+        _total = 0.0;
+        _payment = 0.0;
+        _change = 0.0;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Transaksi berhasil')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Transaksi'),
+        title: const Text('Transaksi'),
+        backgroundColor: Colors.teal,
         actions: [
           IconButton(
-            icon: Icon(Icons.qr_code_scanner),
+            icon: const Icon(Icons.qr_code_scanner),
             onPressed: () {
               // Buka halaman pemindaian barcode
               Navigator.push(
@@ -114,7 +156,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 ),
               );
             },
-          )
+          ),
         ],
       ),
       body: Column(
@@ -137,7 +179,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
             ),
           ),
           Padding(
-            padding: EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 Row(
@@ -172,10 +214,10 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: _completeTransaction,
-                  child: Text('Selesaikan Transaksi'),
                   style: ElevatedButton.styleFrom(
                     minimumSize: Size(double.infinity, 50),
                   ),
+                  child: Text('Selesaikan Transaksi'),
                 ),
               ],
             ),

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pos/db/database_helper.dart';
+import 'package:pos/models/product_model.dart';
+import 'package:pos/models/debt_model.dart';
 import 'package:pos/screens/hutang_screen.dart';
 import 'package:pos/screens/produk_screen.dart';
 import 'package:pos/screens/transaksi_screen.dart';
 import 'package:pos/screens/supplier_screen.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -12,20 +16,49 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // Dummy data (TODO: Ganti dengan data real dari SQLite)
-  double _totalPenjualanHariIni = 2500000;
-  double _totalHutangAktif = 1750000;
-  final List<Map<String, dynamic>> _lowStockProducts = [
-    {'name': 'Indomie Goreng', 'stock': 5},
-    {'name': 'Aqua 600ml', 'stock': 8},
-    {'name': 'Minyak Goreng', 'stock': 3},
-  ];
-
+  final DatabaseHelper _dbHelper = DatabaseHelper();
+  double _totalPenjualanHariIni = 0.0;
+  double _totalHutangAktif = 0.0;
+  List<Product> _lowStockProducts = [];
   final NumberFormat _currencyFormat = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
     decimalDigits: 0,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      // Hitung total penjualan hari ini
+      final today = DateTime.now();
+      final totalSales = await _dbHelper.getTotalSales(today, today);
+      setState(() {
+        _totalPenjualanHariIni = totalSales;
+      });
+
+      // Hitung total hutang aktif
+      final unpaidDebts = await _dbHelper.getUnpaidDebts();
+      final totalDebt = unpaidDebts.fold(0.0, (sum, debt) => sum + debt.totalHutang);
+      setState(() {
+        _totalHutangAktif = totalDebt;
+      });
+
+      // Ambil daftar produk dengan stok rendah (misalnya < 10)
+      final products = await _dbHelper.getAllProducts();
+      setState(() {
+        _lowStockProducts = products.where((product) => product.stok < 10).toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat data: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +189,7 @@ class _MetricCard extends StatelessWidget {
 
 // Custom Widget: Daftar Stok Rendah
 class _LowStockList extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
+  final List<Product> items;
 
   const _LowStockList({required this.items});
 
@@ -166,14 +199,14 @@ class _LowStockList extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       itemBuilder: (context, index) {
-        final item = items[index];
+        final product = items[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: const Icon(Icons.warning, color: Colors.orange),
-            title: Text(item['name']),
+            title: Text(product.namaProduk),
             trailing: Chip(
-              label: Text('${item['stock']}'),
+              label: Text('${product.stok}'),
               backgroundColor: Colors.red[100],
             ),
           ),
