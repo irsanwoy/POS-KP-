@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pos/db/database_helper.dart';
 import 'package:pos/models/product_model.dart';
-
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:pos/models/supplier_model.dart';
 class ProdukScreen extends StatefulWidget {
   const ProdukScreen({super.key});
 
@@ -28,21 +29,18 @@ class _ProdukScreenState extends State<ProdukScreen> {
         _filteredProducts = products;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat produk: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memuat produk: $e')));
     }
   }
 
   void _searchProducts(String query) {
     setState(() {
-      _filteredProducts =
-          _products.where((product) {
-            return product.namaProduk.toLowerCase().contains(
-                  query.toLowerCase(),
-                ) ||
-                (product.barcode != null && product.barcode!.contains(query));
-          }).toList();
+      _filteredProducts = _products.where((product) {
+        return product.namaProduk.toLowerCase().contains(query.toLowerCase()) ||
+            (product.barcode != null &&
+                product.barcode!.contains(query));
+      }).toList();
     });
   }
 
@@ -53,13 +51,11 @@ class _ProdukScreenState extends State<ProdukScreen> {
         _products.removeWhere((product) => product.idProduk == id);
         _filteredProducts = _products;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Produk berhasil dihapus')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Produk berhasil dihapus')));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal menghapus produk: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gagal menghapus produk: $e')));
     }
   }
 
@@ -81,19 +77,18 @@ class _ProdukScreenState extends State<ProdukScreen> {
           ),
         ],
       ),
-      body:
-          _filteredProducts.isEmpty
-              ? const Center(child: Text('Tidak ada produk'))
-              : ListView.builder(
-                itemCount: _filteredProducts.length,
-                itemBuilder: (context, index) {
-                  final product = _filteredProducts[index];
-                  return _ProductCard(
-                    product: product,
-                    onDelete: () => _deleteProduct(product.idProduk!),
-                  );
-                },
-              ),
+      body: _filteredProducts.isEmpty
+          ? const Center(child: Text('Tidak ada produk'))
+          : ListView.builder(
+              itemCount: _filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = _filteredProducts[index];
+                return _ProductCard(
+                  product: product,
+                  onDelete: () => _deleteProduct(product.idProduk!),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final shouldRefresh = await Navigator.push(
@@ -154,7 +149,7 @@ class _ProductCard extends StatelessWidget {
                   ),
                 );
                 if (shouldRefresh == true) {
-                   shouldRefresh(); // Trigger reload
+                  // Trigger reload
                 }
               },
             ),
@@ -163,26 +158,25 @@ class _ProductCard extends StatelessWidget {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder:
-                      (context) => AlertDialog(
-                        title: const Text('Hapus Produk'),
-                        content: const Text(
-                          'Apakah Anda yakin ingin menghapus produk ini?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Batal'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              onDelete();
-                            },
-                            child: const Text('Hapus'),
-                          ),
-                        ],
+                  builder: (context) => AlertDialog(
+                    title: const Text('Hapus Produk'),
+                    content: const Text(
+                      'Apakah Anda yakin ingin menghapus produk ini?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Batal'),
                       ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          onDelete();
+                        },
+                        child: const Text('Hapus'),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -222,14 +216,11 @@ class ProductSearchDelegate extends SearchDelegate {
 
   @override
   Widget buildResults(BuildContext context) {
-    final results =
-        products.where((product) {
-          return product.namaProduk.toLowerCase().contains(
-                query.toLowerCase(),
-              ) ||
-              (product.barcode != null &&
-                  product.barcode!.toLowerCase().contains(query.toLowerCase()));
-        }).toList();
+    final results = products.where((product) {
+      return product.namaProduk.toLowerCase().contains(query.toLowerCase()) ||
+          (product.barcode != null &&
+              product.barcode!.toLowerCase().contains(query.toLowerCase()));
+    }).toList();
 
     return ListView.builder(
       itemCount: results.length,
@@ -237,7 +228,7 @@ class ProductSearchDelegate extends SearchDelegate {
         final product = results[index];
         return _ProductCard(
           product: product,
-          onDelete: () {}, // Handle delete jika diperlukan
+          onDelete: () {}, // Handle delete if necessary
         );
       },
     );
@@ -265,10 +256,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   final TextEditingController _hargaEceranController = TextEditingController();
   final TextEditingController _hargaGrosirController = TextEditingController();
   final TextEditingController _stockController = TextEditingController();
+  int? _selectedSupplierId; // Menyimpan ID Supplier yang dipilih
+  List<Supplier> _suppliers = []; // Daftar Supplier
 
   @override
   void initState() {
     super.initState();
+    _loadSuppliers();
     if (widget.product != null) {
       _nameController.text = widget.product!.namaProduk;
       _barcodeController.text = widget.product!.barcode ?? '';
@@ -276,11 +270,20 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _hargaGrosirController.text =
           widget.product!.hargaGrosir?.toString() ?? '';
       _stockController.text = widget.product!.stok.toString();
+      _selectedSupplierId = widget.product!.idSuplier;
     }
   }
 
-  void _generateBarcode() {
-    _barcodeController.text = DateTime.now().millisecondsSinceEpoch.toString();
+  // Fungsi untuk mengambil daftar supplier dari database
+  Future<void> _loadSuppliers() async {
+    try {
+      final suppliers = await DatabaseHelper().getAllSuppliers(); // Ambil data supplier
+      setState(() {
+        _suppliers = suppliers;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat supplier: $e')));
+    }
   }
 
   void _saveProduct() async {
@@ -290,16 +293,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           idProduk: widget.product?.idProduk,
           namaProduk: _nameController.text,
           hargaEcer: double.parse(_hargaEceranController.text),
-          hargaGrosir:
-              _hargaGrosirController.text.isNotEmpty
-                  ? double.parse(_hargaGrosirController.text)
-                  : null,
+          hargaGrosir: _hargaGrosirController.text.isNotEmpty
+              ? double.parse(_hargaGrosirController.text)
+              : null,
           stok: int.parse(_stockController.text),
-          barcode:
-              _barcodeController.text.isNotEmpty
-                  ? _barcodeController.text
-                  : null,
-          idSuplier: widget.product?.idSuplier,
+          barcode: _barcodeController.text.isNotEmpty
+              ? _barcodeController.text
+              : null,
+          idSuplier: _selectedSupplierId, // Simpan ID Supplier
         );
 
         if (newProduct.idProduk == null) {
@@ -310,9 +311,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
         Navigator.pop(context, true);
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal menyimpan produk: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal menyimpan produk: $e')));
       }
     }
   }
@@ -344,6 +344,33 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 },
               ),
               const SizedBox(height: 16),
+              // Dropdown untuk memilih supplier
+              DropdownButtonFormField<int>(
+                value: _selectedSupplierId,
+                decoration: const InputDecoration(
+                  labelText: 'Pilih Supplier',
+                  border: OutlineInputBorder(),
+                ),
+                items: _suppliers.map((supplier) {
+                  return DropdownMenuItem<int>(
+                    value: supplier.idSuplier,
+                    child: Text(supplier.namaSuplier),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedSupplierId = value;
+                  });
+                },
+                validator: (value) {
+                  if (value == null) {
+                    return 'Supplier wajib dipilih';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              // Input lainnya tetap seperti sebelumnya
               Row(
                 children: [
                   Expanded(
@@ -353,12 +380,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         labelText: 'Barcode',
                         border: OutlineInputBorder(),
                       ),
-                      readOnly: true,
+                      readOnly: false, // Membuat barcode bisa diinput manual
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.qr_code),
-                    onPressed: _generateBarcode,
+                    onPressed: _scanBarcode,
                   ),
                 ],
               ),
@@ -434,5 +461,30 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _hargaGrosirController.dispose();
     _stockController.dispose();
     super.dispose();
+  }
+
+  // Fungsi untuk scan barcode
+  Future<void> _scanBarcode() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Scan Barcode'),
+          ),
+          body: MobileScanner(
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              if (barcodes.isNotEmpty) {
+                Navigator.pop(context, barcodes.first.rawValue);
+              }
+            },
+          ),
+        ),
+      ),
+    );
+    if (result != null) {
+      _barcodeController.text = result;
+    }
   }
 }

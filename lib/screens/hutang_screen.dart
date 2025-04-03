@@ -125,6 +125,18 @@ class _HutangScreenState extends State<HutangScreen> {
                       return _HutangCard(
                         hutang: hutang,
                         onDelete: () => _deleteHutang(hutang.idHutang!),
+                        onEdit: () async {
+                          final shouldRefresh = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => HutangFormScreen(debt: hutang),
+                            ),
+                          );
+                          if (shouldRefresh == true) {
+                            // Panggil ulang _loadHutang setelah selesai edit
+                            await _loadHutang();
+                          }
+                        },
                       );
                     },
                   ),
@@ -151,10 +163,12 @@ class _HutangScreenState extends State<HutangScreen> {
 class _HutangCard extends StatelessWidget {
   final Debt hutang;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;  // Tambahkan callback untuk edit
 
   const _HutangCard({
     required this.hutang,
     required this.onDelete,
+    required this.onEdit,  // Tambahkan parameter ini
   });
 
   @override
@@ -190,43 +204,11 @@ class _HutangCard extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () async {
-                final shouldRefresh = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => HutangFormScreen(debt: hutang),
-                  ),
-                );
-                if (shouldRefresh == true) {
-                  // Refetch data after editing
-                  Navigator.pop(context, true);
-                }
-              },
+              onPressed: onEdit,  // Panggil fungsi onEdit ketika tombol edit ditekan
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Hapus Hutang'),
-                    content: const Text('Apakah Anda yakin ingin menghapus hutang ini?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Batal'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          onDelete();
-                        },
-                        child: const Text('Hapus'),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              onPressed: onDelete,
             ),
           ],
         ),
@@ -275,6 +257,7 @@ class HutangSearchDelegate extends SearchDelegate {
         return _HutangCard(
           hutang: hutang,
           onDelete: () {}, // Handle delete if needed
+          onEdit: () {},   // Handle edit if needed
         );
       },
     );
@@ -345,7 +328,7 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
           await DatabaseHelper().updateDebtStatus(newDebt.idHutang!, _status);
         }
 
-        Navigator.pop(context, true);
+        Navigator.pop(context, true);  // Kembalikan nilai true untuk refresh
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal menyimpan hutang: $e')),
