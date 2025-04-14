@@ -150,62 +150,68 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   }
 
   Future<void> _saveTransaction() async {
-    if (_cart.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Keranjang kosong')),
-      );
-      return;
-    }
+  if (_cart.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Keranjang kosong')),
+    );
+    return;
+  }
 
-    try {
-      final transactionId = await _dbHelper.insertTransaction(
-        Transaction(
-          tanggal: DateTime.now(),
-          totalHarga: _total,
-          metodeBayar: _paymentMethod,
-          statusBayar: _paymentStatus,
+  try {
+    final transactionId = await _dbHelper.insertTransaction(
+      Transaction(
+        tanggal: DateTime.now(),
+        totalHarga: _total,
+        metodeBayar: _paymentMethod,
+        statusBayar: _paymentStatus,
+      ),
+    );
+
+    for (final item in _cart) {
+      await _dbHelper.insertTransactionDetail(
+        TransactionDetail(
+          idTransaksi: transactionId,
+          idProduk: item.product.idProduk!,
+          jumlah: item.quantity,
+          hargaSatuan: item.product.hargaGrosir!,
+          subtotal: item.subtotal,
         ),
       );
 
-      for (final item in _cart) {
-        await _dbHelper.insertTransactionDetail(
-          TransactionDetail(
-            idTransaksi: transactionId,
-            idProduk: item.product.idProduk!,
-            jumlah: item.quantity,
-            hargaSatuan: item.product.hargaGrosir!,
-            subtotal: item.subtotal,
-          ),
-        );
-      }
+      // 🔥 Update stok produk
+      final stokResult = await _dbHelper.updateProductStock(item.product.idProduk!, item.quantity);
+      print('Stok produk ${item.product.namaProduk} dikurangi: ${item.quantity} | Result: $stokResult');
+    }
 
-      if (_paymentStatus == 'hutang') {
-        await _dbHelper.insertDebt(
-          Debt(
-            idTransaksi: transactionId,
-            namaPelanggan: '',
-            totalHutang: _total,
-            status: 'belum lunas',
-            tanggalJatuhTempo: DateTime.now().add(Duration(days: 7)),
-          ),
-        );
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Transaksi berhasil disimpan')),
-      );
-
-      setState(() {
-        _cart.clear();
-        _paymentMethod = 'tunai';
-        _paymentStatus = 'lunas';
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
+    if (_paymentStatus == 'hutang') {
+      await _dbHelper.insertDebt(
+        Debt(
+          idTransaksi: transactionId,
+          namaPelanggan: '', // Optional: isi jika input pelanggan ditambahkan
+          totalHutang: _total,
+          status: 'belum lunas',
+          tanggalJatuhTempo: DateTime.now().add(Duration(days: 7)),
+        ),
       );
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Transaksi berhasil disimpan')),
+    );
+
+    setState(() {
+      _cart.clear();
+      _paymentMethod = 'tunai';
+      _paymentStatus = 'lunas';
+    });
+  } catch (e) {
+    print("Error saat menyimpan transaksi: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
+    );
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
