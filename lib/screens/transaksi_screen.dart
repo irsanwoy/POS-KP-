@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:pos/db/database_helper.dart';
 import 'package:pos/models/transaction_model.dart';
 import 'package:pos/models/debt_model.dart';
+import 'package:pos/models/product_model.dart';
 
 class TransaksiScreen extends StatefulWidget {
   const TransaksiScreen({super.key});
@@ -13,12 +14,16 @@ class TransaksiScreen extends StatefulWidget {
 
 class _TransaksiScreenState extends State<TransaksiScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  List<Map<String, dynamic>> _cartItems = [];
+  Product? _product;
+  String _barcode = '';
+  int _quantity = 1;
+  double _totalPrice = 0.0;
+  String _paymentMethod = 'tunai';
+  String _paymentStatus = 'lunas';
   double _total = 0.0;
   double _payment = 0.0;
   double _change = 0.0;
 
-  // Controller untuk MobileScanner
   final MobileScannerController _scannerController = MobileScannerController();
 
   @override
@@ -27,30 +32,29 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     super.dispose();
   }
 
+  Future<void> _scanBarcode() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BarcodeScannerPage(
+          onScanResult: (barcode) {
+            _addProductToCart(barcode);
+            Navigator.pop(context); // Kembali ke halaman transaksi
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _addProductToCart(String barcode) async {
     try {
       final product = await _dbHelper.getProductByBarcode(barcode);
       if (product != null) {
         setState(() {
-          bool exists = false;
-          for (var item in _cartItems) {
-            if (item['id'] == product.idProduk) {
-              item['quantity'] += 1;
-              exists = true;
-              break;
-            }
-          }
-
-          if (!exists) {
-            _cartItems.add({
-              'id': product.idProduk,
-              'name': product.namaProduk,
-              'price': product.hargaEcer,
-              'quantity': 1,
-            });
-          }
-
-          _calculateTotal();
+          _product = product;
+          _barcode = barcode;
+          _quantity = 1;  // Set default quantity
+          _calculateTotalPrice();
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -64,68 +68,72 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
   }
 
-  void _calculateTotal() {
-    _total = _cartItems.fold(0.0, (sum, item) {
-      return sum + (item['price'] * item['quantity']);
-    });
-    _change = _payment - _total;
+  void _calculateTotalPrice() {
+    if (_product != null && _product!.hargaGrosir != null) {
+      _totalPrice = _product!.hargaGrosir! * _quantity;
+    } else {
+      _totalPrice = 0.0;  // Jika hargaGrosir null, atur totalPrice menjadi 0
+    }
   }
 
-  Future<void> _completeTransaction() async {
-    if (_payment < _total) {
+  Future<void> _saveTransaction() async {
+    if (_product == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pembayaran kurang')),
+        SnackBar(content: Text('Silakan scan produk terlebih dahulu')),
       );
       return;
     }
 
     try {
-      // Simpan transaksi utama
+      final int? productId = _product!.idProduk; // Pastikan _product tidak null
+      final double? price = _product!.hargaGrosir;
+    
       final transactionId = await _dbHelper.insertTransaction(
         Transaction(
           tanggal: DateTime.now(),
-          totalHarga: _total,
-          metodeBayar: _payment >= _total ? 'tunai' : 'non-tunai',
-          statusBayar: _payment >= _total ? 'lunas' : 'hutang',
+          totalHarga: _totalPrice,
+          metodeBayar: _paymentMethod,
+          statusBayar: _paymentStatus,
         ),
       );
 
       // Simpan detail transaksi
-      for (var item in _cartItems) {
-        await _dbHelper.insertTransactionDetail(
-          TransactionDetail(
-            idTransaksi: transactionId,
-            idProduk: item['id'],
-            jumlah: item['quantity'],
-            hargaSatuan: item['price'],
-            subtotal: item['price'] * item['quantity'],
-          ),
-        );
-      }
+      await _dbHelper.insertTransactionDetail(
+        TransactionDetail(
+          idTransaksi: transactionId,
+          idProduk: productId!,  // Using the previously declared productId
+          jumlah: _quantity,
+          hargaSatuan: price!,  // Using non-null assertion as we know price exists
+          subtotal: _totalPrice,
+        ),
+      );
 
-      // Jika ada hutang, simpan ke tabel hutang_pelanggan
-      if (_payment < _total) {
+      // Jika status bayar hutang, simpan ke tabel hutang_pelanggan
+      if (_paymentStatus == 'hutang') {
         await _dbHelper.insertDebt(
           Debt(
             idTransaksi: transactionId,
-            namaPelanggan: '', // Anda bisa menambahkan logika untuk mendapatkan nama pelanggan
-            totalHutang: _total - _payment,
+            namaPelanggan: '', // Logika untuk mendapatkan nama pelanggan
+            totalHutang: _totalPrice,
             status: 'belum lunas',
-            tanggalJatuhTempo: DateTime.now().add(const Duration(days: 7)), // Contoh jatuh tempo dalam 7 hari
+            tanggalJatuhTempo: DateTime.now().add(const Duration(days: 7)),
           ),
         );
       }
 
-      setState(() {
-        _cartItems.clear();
-        _total = 0.0;
-        _payment = 0.0;
-        _change = 0.0;
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Transaksi berhasil')),
+        SnackBar(content: Text('Transaksi berhasil disimpan')),
       );
+
+      // Reset setelah transaksi selesai
+      setState(() {
+        _product = null;
+        _barcode = '';
+        _quantity = 1;
+        _totalPrice = 0.0;
+        _paymentMethod = 'tunai';
+        _paymentStatus = 'lunas';
+      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
@@ -137,124 +145,141 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Transaksi'),
+        title: const Text('Tambah Transaksi'),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () {
-              // Buka halaman pemindaian barcode
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => BarcodeScannerPage(
-                    onScanResult: (barcode) {
-                      _addProductToCart(barcode);
-                      Navigator.pop(context); // Kembali ke halaman transaksi
-                    },
-                  ),
-                ),
-              );
-            },
+            onPressed: _scanBarcode,
           ),
         ],
       ),
       body: Column(
         children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: _cartItems.length,
-              itemBuilder: (context, index) {
-                final item = _cartItems[index];
-                return ListTile(
-                  title: Text(item['name']),
-                  subtitle: Text('${item['quantity']} x ${item['price']}'),
-                  trailing: Text('Rp ${(item['price'] * item['quantity']).toStringAsFixed(2)}'),
-                  onTap: () {
-                    // Edit quantity dialog
-                    _showEditDialog(index);
-                  },
-                );
-              },
+          // Form untuk detail produk yang dipindai
+          if (_product != null) ...[
+            ListTile(
+              title: Text('Nama Produk: ${_product!.namaProduk}'),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+            ListTile(
+              title: Text('Satuan: ${_product!.hargaEcer}'),
+            ),
+            ListTile(
+              title: Text('Harga Grosir: Rp ${_product!.hargaGrosir}'),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Total:'),
-                    Text('Rp ${_total.toStringAsFixed(2)}'),
-                  ],
-                ),
-                SizedBox(height: 10),
-                TextField(
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Pembayaran',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
+                Text('Jumlah:'),
+                IconButton(
+                  icon: Icon(Icons.remove),
+                  onPressed: () {
                     setState(() {
-                      _payment = double.tryParse(value) ?? 0.0;
-                      _change = _payment - _total;
+                      if (_quantity > 1) _quantity--;
+                      _calculateTotalPrice();
                     });
                   },
                 ),
-                SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Kembalian:'),
-                    Text('Rp ${_change.toStringAsFixed(2)}'),
-                  ],
+                Text('$_quantity'),
+                IconButton(
+                  icon: Icon(Icons.add),
+                  onPressed: () {
+                    setState(() {
+                      _quantity++;
+                      _calculateTotalPrice();
+                    });
+                  },
                 ),
-                SizedBox(height: 20),
+              ],
+            ),
+            ListTile(
+              title: Text('Total Harga: Rp $_totalPrice'),
+            ),
+          ],
+          // Pilihan metode pembayaran
+          ListTile(
+            title: Text('Metode Pembayaran'),
+            subtitle: Row(
+              children: [
+                Radio<String>(
+                  value: 'tunai',
+                  groupValue: _paymentMethod,
+                  onChanged: (value) {
+                    setState(() {
+                      _paymentMethod = value!;
+                    });
+                  },
+                ),
+                Text('Tunai'),
+                Radio<String>(
+                  value: 'non-tunai',
+                  groupValue: _paymentMethod,
+                  onChanged: (value) {
+                    setState(() {
+                      _paymentMethod = value!;
+                    });
+                  },
+                ),
+                Text('Non-Tunai'),
+              ],
+            ),
+          ),
+          // Pilihan status pembayaran
+          ListTile(
+            title: Text('Status Pembayaran'),
+            subtitle: Row(
+              children: [
+                Radio<String>(
+                  value: 'lunas',
+                  groupValue: _paymentStatus,
+                  onChanged: (value) {
+                    setState(() {
+                      _paymentStatus = value!;
+                    });
+                  },
+                ),
+                Text('Lunas'),
+                Radio<String>(
+                  value: 'hutang',
+                  groupValue: _paymentStatus,
+                  onChanged: (value) {
+                    setState(() {
+                      _paymentStatus = value!;
+                    });
+                  },
+                ),
+                Text('Hutang'),
+              ],
+            ),
+          ),
+          // Tombol Simpan dan Batal
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
                 ElevatedButton(
-                  onPressed: _completeTransaction,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(double.infinity, 50),
-                  ),
-                  child: Text('Selesaikan Transaksi'),
+                  onPressed: () {
+                    setState(() {
+                      _product = null;
+                      _barcode = '';
+                      _quantity = 1;
+                      _totalPrice = 0.0;
+                      _paymentMethod = 'tunai';
+                      _paymentStatus = 'lunas';
+                    });
+                  },
+                  child: Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: _saveTransaction,
+                  child: Text('Simpan'),
                 ),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  void _showEditDialog(int index) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        int quantity = _cartItems[index]['quantity'];
-        return AlertDialog(
-          title: Text('Edit Jumlah'),
-          content: TextField(
-            keyboardType: TextInputType.number,
-            controller: TextEditingController(text: quantity.toString()),
-            onChanged: (value) {
-              quantity = int.tryParse(value) ?? 1;
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _cartItems[index]['quantity'] = quantity;
-                  _calculateTotal();
-                });
-                Navigator.pop(context);
-              },
-              child: Text('Simpan'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

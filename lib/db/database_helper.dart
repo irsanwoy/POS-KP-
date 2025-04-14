@@ -200,11 +200,12 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> updateProductStock(int productId, int quantityChange) async {
+  // Fungsi untuk mengurangi stok produk setelah transaksi
+  Future<int> updateProductStock(int productId, int quantitySold) async {
     final db = await database;
     return await db.rawUpdate(
-      'UPDATE $tableProduk SET stok = stok + ? WHERE id_produk = ?',
-      [quantityChange, productId],
+      'UPDATE $tableProduk SET stok = stok - ? WHERE id_produk = ?',
+      [quantitySold, productId],
     );
   }
 
@@ -278,12 +279,11 @@ class DatabaseHelper {
   Future<int> insertDebt(Debt debt) async {
     final db = await database;
     try {
-      // Insert debt record into the database
       final result = await db.insert(tableHutang, debt.toMap());
       return result; // Return the id of the inserted record
     } catch (e) {
       print("Error inserting debt: $e");
-      return -1; // Return -1 if error occurs
+      return -1;
     }
   }
 
@@ -294,12 +294,6 @@ class DatabaseHelper {
       where: 'status = ?',
       whereArgs: ['belum lunas'],
     );
-
-    if (maps.isEmpty) {
-      print("No unpaid debts found");
-    }
-
-    // Map the query result to a list of Debt objects
     return maps.map((map) => Debt.fromMap(map)).toList();
   }
 
@@ -312,10 +306,10 @@ class DatabaseHelper {
         where: 'id_hutang = ?',
         whereArgs: [debtId],
       );
-      return result; // Return the number of rows affected
+      return result;
     } catch (e) {
       print("Error updating debt status: $e");
-      return -1; // Return -1 if error occurs
+      return -1;
     }
   }
 
@@ -327,10 +321,10 @@ class DatabaseHelper {
         where: 'id_hutang = ?',
         whereArgs: [debtId],
       );
-      return result; // Return the number of rows affected
+      return result;
     } catch (e) {
       print("Error deleting debt: $e");
-      return -1; // Return -1 if error occurs
+      return -1;
     }
   }
 
