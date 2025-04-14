@@ -41,6 +41,8 @@ dependencies:
   pdf: ^3.10.2
   syncfusion_flutter_charts: ^28.2.7
   mobile_scanner: ^6.0.7
+  permission_handler: ^11.3.0 # versi terbaru
+
   # barcode_scanner: ^6.1.1
   # flutter_barcode_scanner: ^2.0.0
 
