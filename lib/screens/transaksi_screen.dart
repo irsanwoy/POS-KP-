@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:pos/db/database_helper.dart';
 import 'package:pos/models/transaction_model.dart';
-import 'package:pos/models/debt_model.dart';
 import 'package:pos/models/product_model.dart';
 import 'package:intl/intl.dart';
 
@@ -13,7 +12,7 @@ class CartItem {
 
   CartItem({required this.product, this.quantity = 1});
 
-  double get subtotal => (product.hargaGrosir ?? 0) * quantity;
+  double get subtotal => (product.hargaEcer ?? 0) * quantity; // Menggunakan harga Ecer untuk subtotal
 }
 
 class TransaksiScreen extends StatefulWidget {
@@ -26,21 +25,20 @@ class TransaksiScreen extends StatefulWidget {
 class _TransaksiScreenState extends State<TransaksiScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   List<CartItem> _cart = [];
-  String _paymentMethod = 'tunai';
-  String _paymentStatus = 'lunas';
 
   double get _total => _cart.fold(0, (sum, item) => sum + item.subtotal);
-
-  final _manualBarcodeController = TextEditingController();
-  final _manualQtyController = TextEditingController(text: '1');
 
   String _barcodeBuffer = '';
   final FocusNode _barcodeFocusNode = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    _barcodeFocusNode.requestFocus(); // Fokus langsung ke scanner fisik
+  }
+
+  @override
   void dispose() {
-    _manualBarcodeController.dispose();
-    _manualQtyController.dispose();
     super.dispose();
   }
 
@@ -65,7 +63,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
               Navigator.pop(context);
               _barcodeFocusNode.requestFocus();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Siap menerima input dari scanner fisik')),
+                SnackBar(content: Text('✅ Siap menerima input dari scanner fisik')),
               );
             },
           ),
@@ -81,7 +79,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         builder: (context) => BarcodeScannerPage(
           onScanResult: (barcode) {
             debugPrint('📥 Barcode dari kamera: $barcode');
-            Navigator.pop(context, barcode); // Pop setelah barcode berhasil
+            Navigator.pop(context, barcode);
           },
         ),
       ),
@@ -92,55 +90,32 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
   }
 
-  void _showManualInputDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Input Manual'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _manualBarcodeController,
-              decoration: InputDecoration(labelText: 'Barcode'),
-            ),
-            TextField(
-              controller: _manualQtyController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: 'Jumlah'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
-              final barcode = _manualBarcodeController.text.trim();
-              final qty = int.tryParse(_manualQtyController.text) ?? 1;
-              _handleScannedBarcode(barcode, quantity: qty);
-              Navigator.pop(context);
-            },
-            child: Text('Tambah'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleScannedBarcode(String barcode, {int quantity = 1}) async {
-    final product = await _dbHelper.getProductByBarcode(barcode);
+    final cleaned = barcode.trim().replaceAll('\n', '').replaceAll('\r', '');
+    debugPrint('📥 Barcode dibersihkan: "$cleaned"');
+
+    if (cleaned.isEmpty || cleaned.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ Barcode tidak valid atau kosong')),
+      );
+      return;
+    }
+
+    final product = await _dbHelper.getProductByBarcode(cleaned);
     if (product != null) {
       _addToCart(product, quantity);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Produk tidak ditemukan')),
+        SnackBar(content: Text('❌ Produk tidak ditemukan: $cleaned')),
       );
     }
   }
 
   void _addToCart(Product product, int quantity) {
     setState(() {
-      final index = _cart.indexWhere((item) => item.product.idProduk == product.idProduk);
+      final index = _cart.indexWhere(
+        (item) => item.product.idProduk == product.idProduk,
+      );
       if (index != -1) {
         _cart[index].quantity += quantity;
       } else {
@@ -150,68 +125,53 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   }
 
   Future<void> _saveTransaction() async {
-  if (_cart.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Keranjang kosong')),
-    );
-    return;
-  }
+    if (_cart.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Keranjang kosong')));
+      return;
+    }
 
-  try {
-    final transactionId = await _dbHelper.insertTransaction(
-      Transaction(
-        tanggal: DateTime.now(),
-        totalHarga: _total,
-        metodeBayar: _paymentMethod,
-        statusBayar: _paymentStatus,
-      ),
-    );
-
-    for (final item in _cart) {
-      await _dbHelper.insertTransactionDetail(
-        TransactionDetail(
-          idTransaksi: transactionId,
-          idProduk: item.product.idProduk!,
-          jumlah: item.quantity,
-          hargaSatuan: item.product.hargaGrosir!,
-          subtotal: item.subtotal,
+    try {
+      final transactionId = await _dbHelper.insertTransaction(
+        Transaction(
+          tanggal: DateTime.now(),
+          totalHarga: _total,
+          metodeBayar: 'tunai', // default karena gak dipakai
+          statusBayar: 'lunas', // default juga
         ),
       );
 
-      // 🔥 Update stok produk
-      final stokResult = await _dbHelper.updateProductStock(item.product.idProduk!, item.quantity);
-      print('Stok produk ${item.product.namaProduk} dikurangi: ${item.quantity} | Result: $stokResult');
-    }
+      for (final item in _cart) {
+        await _dbHelper.insertTransactionDetail(
+          TransactionDetail(
+            idTransaksi: transactionId,
+            idProduk: item.product.idProduk!,
+            jumlah: item.quantity,
+            hargaSatuan: item.product.hargaEcer, // Harga eceran
+            subtotal: item.subtotal,
+          ),
+        );
 
-    if (_paymentStatus == 'hutang') {
-      await _dbHelper.insertDebt(
-        Debt(
-          idTransaksi: transactionId,
-          namaPelanggan: '', // Optional: isi jika input pelanggan ditambahkan
-          totalHutang: _total,
-          status: 'belum lunas',
-          tanggalJatuhTempo: DateTime.now().add(Duration(days: 7)),
-        ),
+        await _dbHelper.updateProductStock(
+          item.product.idProduk!,
+          item.quantity,
+        );
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✅ Transaksi berhasil disimpan')),
+      );
+
+      setState(() {
+        _cart.clear();
+      });
+    } catch (e) {
+      debugPrint("❌ Error saat menyimpan transaksi: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
       );
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Transaksi berhasil disimpan')),
-    );
-
-    setState(() {
-      _cart.clear();
-      _paymentMethod = 'tunai';
-      _paymentStatus = 'lunas';
-    });
-  } catch (e) {
-    print("Error saat menyimpan transaksi: $e");
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
-    );
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -221,10 +181,6 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
-            icon: Icon(Icons.calculate),
-            onPressed: _showManualInputDialog,
-          ),
-          IconButton(
             icon: Icon(Icons.qr_code_scanner),
             onPressed: _showScanOptionDialog,
           ),
@@ -232,10 +188,14 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
       ),
       body: RawKeyboardListener(
         focusNode: _barcodeFocusNode,
+        autofocus: true,
         onKey: (event) {
           if (event is RawKeyDownEvent) {
             final label = event.logicalKey.keyLabel;
+            debugPrint('⌨️ Key pressed: "$label"');
+
             if (label == 'Enter') {
+              debugPrint('📤 Barcode dari scanner fisik: $_barcodeBuffer');
               _handleScannedBarcode(_barcodeBuffer);
               _barcodeBuffer = '';
             } else if (label.isNotEmpty && label != 'Shift') {
@@ -243,7 +203,6 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
             }
           }
         },
-        autofocus: true,
         child: Column(
           children: [
             Expanded(
@@ -251,10 +210,13 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 itemCount: _cart.length,
                 itemBuilder: (context, index) {
                   final item = _cart[index];
+                  final grosir = NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.product.hargaGrosir ?? 0);
+                  final eceran = NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.product.hargaEcer);
                   return ListTile(
                     title: Text(item.product.namaProduk ?? ''),
                     subtitle: Text(
-                      'Jumlah: ${item.quantity} | Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.subtotal)}',
+                      'Jumlah: ${item.quantity} | Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.subtotal)}\n'
+                      'Harga Grosir: $grosir\nHarga Eceran: $eceran',
                     ),
                     trailing: IconButton(
                       icon: Icon(Icons.delete),
@@ -273,44 +235,6 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
               trailing: Text(
                 NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(_total),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-            ListTile(
-              title: Text('Metode Pembayaran'),
-              subtitle: Row(
-                children: [
-                  Radio<String>(
-                    value: 'tunai',
-                    groupValue: _paymentMethod,
-                    onChanged: (value) => setState(() => _paymentMethod = value!),
-                  ),
-                  Text('Tunai'),
-                  Radio<String>(
-                    value: 'non-tunai',
-                    groupValue: _paymentMethod,
-                    onChanged: (value) => setState(() => _paymentMethod = value!),
-                  ),
-                  Text('Non-Tunai'),
-                ],
-              ),
-            ),
-            ListTile(
-              title: Text('Status Pembayaran'),
-              subtitle: Row(
-                children: [
-                  Radio<String>(
-                    value: 'lunas',
-                    groupValue: _paymentStatus,
-                    onChanged: (value) => setState(() => _paymentStatus = value!),
-                  ),
-                  Text('Lunas'),
-                  Radio<String>(
-                    value: 'hutang',
-                    groupValue: _paymentStatus,
-                    onChanged: (value) => setState(() => _paymentStatus = value!),
-                  ),
-                  Text('Hutang'),
-                ],
               ),
             ),
             Padding(
@@ -335,6 +259,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     );
   }
 }
+
 class BarcodeScannerPage extends StatefulWidget {
   final Function(String) onScanResult;
 

@@ -170,16 +170,27 @@ class DatabaseHelper {
   }
 
   Future<Product?> getProductByBarcode(String barcode) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      tableProduk,
-      where: 'barcode = ?',
-      whereArgs: [barcode],
-      limit: 1,
-    );
-    if (maps.isEmpty) return null;
-    return Product.fromMap(maps.first);
+  final db = await database;
+
+  final cleanedBarcode = barcode.trim().replaceAll('\n', '').replaceAll('\r', '');
+  print('🔍 Mencari produk dengan barcode: "$cleanedBarcode"');
+
+  final List<Map<String, dynamic>> maps = await db.query(
+    tableProduk,
+    where: 'LOWER(barcode) = LOWER(?)',
+    whereArgs: [cleanedBarcode],
+    limit: 1,
+  );
+
+  if (maps.isEmpty) {
+    print('❌ Produk tidak ditemukan di database');
+    return null;
   }
+
+  print('✅ Produk ditemukan: ${maps.first}');
+  return Product.fromMap(maps.first);
+}
+
 
   Future<int> updateProduct(Product product) async {
     final db = await database;
