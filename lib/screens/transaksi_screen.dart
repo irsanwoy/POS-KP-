@@ -12,7 +12,7 @@ class CartItem {
 
   CartItem({required this.product, this.quantity = 1});
 
-  double get subtotal => (product.hargaEcer ?? 0) * quantity; // Menggunakan harga Ecer untuk subtotal
+  double get subtotal => (product.hargaEcer) * quantity; // Menggunakan harga Ecer untuk subtotal
 }
 
 class TransaksiScreen extends StatefulWidget {
@@ -212,29 +212,50 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                   final item = _cart[index];
                   final grosir = NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.product.hargaGrosir ?? 0);
                   final eceran = NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.product.hargaEcer);
-                  return ListTile(
-                    title: Text(item.product.namaProduk ?? ''),
-                    subtitle: Text(
-                      'Jumlah: ${item.quantity} | Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.subtotal)}\n'
-                      'Harga Grosir: $grosir\nHarga Eceran: $eceran',
+                  return Card(
+                    elevation: 4,
+                    margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete),
-                      onPressed: () {
-                        setState(() {
-                          _cart.removeAt(index);
-                        });
-                      },
+                    child: ListTile(
+                      contentPadding: EdgeInsets.all(16),
+                      title: Text(item.product.namaProduk ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Jumlah: ${item.quantity}'),
+                          Text('Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.subtotal)}'),
+                          SizedBox(height: 4),
+                          Text('Harga Grosir: $grosir'),
+                          Text('Harga Eceran: $eceran'),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _cart.removeAt(index);
+                          });
+                        },
+                      ),
                     ),
                   );
                 },
               ),
             ),
-            ListTile(
-              title: Text('Total'),
-              trailing: Text(
-                NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(_total),
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: ListTile(
+                title: Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                trailing: Text(
+                  NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(_total),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             Padding(
@@ -243,10 +264,22 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red, // Batal button warna merah
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                     onPressed: () => setState(() => _cart.clear()),
                     child: Text('Batal'),
                   ),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal, // Simpan button warna teal
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                     onPressed: _saveTransaction,
                     child: Text('Simpan'),
                   ),

@@ -64,7 +64,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kelola Produk'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: Colors.teal,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
