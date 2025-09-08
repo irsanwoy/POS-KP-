@@ -1,12 +1,13 @@
 // main.dart
 import 'package:flutter/material.dart';
+import 'screens/loading_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/transaksi_screen.dart';
 import 'screens/produk_screen.dart';
 import 'screens/hutang_screen.dart';
 import 'screens/supplier_screen.dart';
-import 'screens/analisis_screen.dart'; // Import screen analisis baru
+import 'screens/analisis_screen.dart';
 import 'components/bottom_navbar.dart';
 
 void main() => runApp(MyApp());
@@ -17,13 +18,18 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SRC Rudi - Toko Kelontong',
       debugShowCheckedModeBanner: false,
-      // Mulai dari login screen
+      // Mulai dari loading screen
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginScreen(),
+        '/': (context) => LoadingScreen(
+          nextScreen: LoginScreen(),
+          loadingText: 'Memuat aplikasi kasir...',
+          durationSeconds: 3,
+        ),
+        '/login': (context) => LoginScreen(),
         '/cashier_dashboard': (context) => MainScreen(userRole: 'kasir'),
         '/owner_dashboard': (context) => MainScreen(userRole: 'pemilik'),
-        '/analisis': (context) => AnalisisScreen(), // Route untuk analisis
+        '/analisis': (context) => AnalisisScreen(),
       },
     );
   }
@@ -59,11 +65,11 @@ class _MainScreenState extends State<MainScreen> {
         ProdukScreen(),
         HutangScreen(),
         SupplierScreen(),
-        AnalisisScreen(), // Tambahkan screen analisis
+        AnalisisScreen(),
       ];
       _titles = ['Dashboard', 'Transaksi', 'Produk', 'Hutang', 'Supplier', 'Analisis'];
     } else {
-      // Kasir tidak bisa akses analisis (hanya pemilik)
+      // Kasir tidak bisa akses analisis dan supplier
       _screens = [
         DashboardScreen(),
         TransaksiScreen(),
@@ -95,9 +101,14 @@ class _MainScreenState extends State<MainScreen> {
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/');
+                // Kembali ke loading screen, lalu ke login
+                Navigator.pushNamedAndRemoveUntil(
+                  context, 
+                  '/', 
+                  (route) => false,
+                );
               },
-              child: Text('Ya, Keluar'),
+              child: Text('Ya, Keluar', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -111,6 +122,8 @@ class _MainScreenState extends State<MainScreen> {
       currentIndex: _selectedIndex,
       onTap: _onItemTapped,
       type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.red,
+      unselectedItemColor: Colors.grey,
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.home),
