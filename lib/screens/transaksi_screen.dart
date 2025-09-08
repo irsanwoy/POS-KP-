@@ -25,6 +25,7 @@ class TransaksiScreen extends StatefulWidget {
 class _TransaksiScreenState extends State<TransaksiScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   List<CartItem> _cart = [];
+  int? _lastTransactionId;
 
   double get _total => _cart.fold(0, (sum, item) => sum + item.subtotal);
 
@@ -158,6 +159,10 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         );
       }
 
+      setState(() {
+        _lastTransactionId = transactionId;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('✅ Transaksi berhasil disimpan')),
       );
@@ -171,6 +176,83 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
       );
     }
+  }
+
+  String _generateReceiptText() {
+    if (_cart.isEmpty && _lastTransactionId == null) return '';
+    
+    final now = DateTime.now();
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm:ss');
+    final currencyFormat = NumberFormat.currency(locale: 'id', symbol: 'Rp ');
+    
+    String receipt = '';
+    receipt += '================================\n';
+    receipt += '            SRC RUDI            \n';
+    receipt += '================================\n';
+    receipt += 'Tanggal: ${dateFormat.format(now)}\n';
+    if (_lastTransactionId != null) {
+      receipt += 'No. Transaksi: $_lastTransactionId\n';
+    }
+    receipt += '--------------------------------\n';
+    
+    final itemsToShow = _cart.isNotEmpty ? _cart : [];
+    
+    for (final item in itemsToShow) {
+      receipt += '${item.product.namaProduk ?? 'Produk'}\n';
+      receipt += '  ${item.quantity} x ${currencyFormat.format(item.product.hargaEcer)}\n';
+      receipt += '  = ${currencyFormat.format(item.subtotal)}\n';
+      receipt += '--------------------------------\n';
+    }
+    
+    receipt += 'TOTAL: ${currencyFormat.format(_total)}\n';
+    receipt += '================================\n';
+    receipt += '     Terima kasih atas\n';
+    receipt += '      kunjungan Anda!\n';
+    receipt += '================================\n';
+    
+    return receipt;
+  }
+
+  void _showReceiptPreview() {
+    final receiptText = _generateReceiptText();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Preview Struk'),
+        content: SingleChildScrollView(
+          child: Container(
+            width: double.maxFinite,
+            child: Text(
+              receiptText,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Tutup'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: receiptText));
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('📋 Struk berhasil disalin ke clipboard!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
+            ),
+            child: Text('Salin ke Clipboard'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -260,28 +342,59 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
             ),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red, // Batal button warna merah
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  // Row pertama: Batal dan Simpan
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () => setState(() {
+                            _cart.clear();
+                            _lastTransactionId = null;
+                          }),
+                          child: Text('Batal'),
+                        ),
                       ),
-                    ),
-                    onPressed: () => setState(() => _cart.clear()),
-                    child: Text('Batal'),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: _saveTransaction,
+                          child: Text('Simpan'),
+                        ),
+                      ),
+                    ],
                   ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal, // Simpan button warna teal
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  SizedBox(height: 8),
+                  // Row kedua: Print Struk (full width)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
+                      onPressed: _cart.isNotEmpty || _lastTransactionId != null 
+                          ? _showReceiptPreview 
+                          : null,
+                      icon: Icon(Icons.receipt_long),
+                      label: Text('Print Struk'),
                     ),
-                    onPressed: _saveTransaction,
-                    child: Text('Simpan'),
                   ),
                 ],
               ),
