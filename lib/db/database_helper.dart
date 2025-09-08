@@ -6,6 +6,8 @@ import '../models/transaction_model.dart';
 import '../models/debt_model.dart';
 import '../models/stock_model.dart';
 
+
+
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
@@ -17,6 +19,8 @@ class DatabaseHelper {
   final String tableHutang = 'hutang_pelanggan';
   final String tableStokMasuk = 'stok_masuk';
   final String tableSuplier = 'suplier';
+
+
 
   DatabaseHelper._internal();
 
@@ -109,6 +113,29 @@ class DatabaseHelper {
             FOREIGN KEY (id_suplier) REFERENCES $tableSuplier(id_suplier)
           )
         ''');
+
+       // === TABEL USERS ===
+        await db.execute('''
+          CREATE TABLE users(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            role TEXT
+          )
+        ''');
+
+       // Insert user default
+        await db.insert('users', {
+          'username': 'kasir',
+          'password': '12345',
+          'role': 'kasir',
+        });
+
+            await db.insert('users', {
+          'username': 'pemilik',
+          'password': '12345',
+          'role': 'pemilik',
+        });
       },
       version: 1,
     );
