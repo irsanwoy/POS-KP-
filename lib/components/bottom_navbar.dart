@@ -1,4 +1,3 @@
-// components/bottom_navbar.dart
 import 'package:flutter/material.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
@@ -6,10 +5,10 @@ class CustomBottomNavBar extends StatelessWidget {
   final Function(int) onTap;
 
   const CustomBottomNavBar({
-    super.key,
+    Key? key,
     required this.currentIndex,
     required this.onTap,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +16,10 @@ class CustomBottomNavBar extends StatelessWidget {
       currentIndex: currentIndex,
       onTap: onTap,
       type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.red,
+      unselectedItemColor: Colors.grey,
+      selectedFontSize: 12,
+      unselectedFontSize: 10,
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.home),
@@ -37,6 +40,10 @@ class CustomBottomNavBar extends StatelessWidget {
         BottomNavigationBarItem(
           icon: Icon(Icons.local_shipping),
           label: 'Supplier',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.analytics),
+          label: 'Analisis',
         ),
       ],
     );

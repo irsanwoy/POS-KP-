@@ -6,6 +6,7 @@ import 'screens/transaksi_screen.dart';
 import 'screens/produk_screen.dart';
 import 'screens/hutang_screen.dart';
 import 'screens/supplier_screen.dart';
+import 'screens/analisis_screen.dart'; // Import screen analisis baru
 import 'components/bottom_navbar.dart';
 
 void main() => runApp(MyApp());
@@ -22,6 +23,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => LoginScreen(),
         '/cashier_dashboard': (context) => MainScreen(userRole: 'kasir'),
         '/owner_dashboard': (context) => MainScreen(userRole: 'pemilik'),
+        '/analisis': (context) => AnalisisScreen(), // Route untuk analisis
       },
     );
   }
@@ -50,17 +52,18 @@ class _MainScreenState extends State<MainScreen> {
 
   void _initializeScreens() {
     if (widget.userRole == 'pemilik') {
-      // Pemilik bisa akses semua fitur
+      // Pemilik bisa akses semua fitur termasuk analisis
       _screens = [
         DashboardScreen(),
         TransaksiScreen(),
         ProdukScreen(),
         HutangScreen(),
         SupplierScreen(),
+        AnalisisScreen(), // Tambahkan screen analisis
       ];
-      _titles = ['Dashboard', 'Transaksi', 'Produk', 'Hutang', 'Supplier'];
+      _titles = ['Dashboard', 'Transaksi', 'Produk', 'Hutang', 'Supplier', 'Analisis'];
     } else {
-      // Kasir hanya bisa akses fitur tertentu
+      // Kasir tidak bisa akses analisis (hanya pemilik)
       _screens = [
         DashboardScreen(),
         TransaksiScreen(),
@@ -102,7 +105,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Bottom nav khusus untuk kasir (tanpa supplier)
+  // Bottom nav khusus untuk kasir (tanpa supplier dan analisis)
   Widget _buildCashierBottomNavBar() {
     return BottomNavigationBar(
       currentIndex: _selectedIndex,
@@ -124,6 +127,45 @@ class _MainScreenState extends State<MainScreen> {
         BottomNavigationBarItem(
           icon: Icon(Icons.money_off),
           label: 'Hutang',
+        ),
+      ],
+    );
+  }
+
+  // Bottom nav khusus untuk pemilik (dengan semua fitur termasuk analisis)
+  Widget _buildOwnerBottomNavBar() {
+    return BottomNavigationBar(
+      currentIndex: _selectedIndex,
+      onTap: _onItemTapped,
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.red,
+      unselectedItemColor: Colors.grey,
+      selectedFontSize: 12,
+      unselectedFontSize: 10,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Beranda',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.point_of_sale),
+          label: 'Transaksi',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.inventory),
+          label: 'Produk',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.money_off),
+          label: 'Hutang',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.local_shipping),
+          label: 'Supplier',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.analytics),
+          label: 'Analisis',
         ),
       ],
     );
@@ -164,10 +206,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
       body: _screens[_selectedIndex],
       bottomNavigationBar: widget.userRole == 'pemilik' 
-        ? CustomBottomNavBar(
-            currentIndex: _selectedIndex,
-            onTap: _onItemTapped,
-          )
+        ? _buildOwnerBottomNavBar()
         : _buildCashierBottomNavBar(),
     );
   }
