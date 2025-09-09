@@ -215,7 +215,7 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Analisis Produk'),
+        // title: Text('Analisis Produk'),
         backgroundColor: Colors.red,
         foregroundColor: Colors.white,
         actions: [

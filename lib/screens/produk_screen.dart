@@ -63,8 +63,8 @@ class _ProdukScreenState extends State<ProdukScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kelola Produk'),
-        backgroundColor: Colors.teal,
+        // title: const Text('Kelola Produk'),
+        backgroundColor: Colors.red,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

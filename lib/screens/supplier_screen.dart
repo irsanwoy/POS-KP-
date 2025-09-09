@@ -116,8 +116,8 @@ class _SupplierScreenState extends State<SupplierScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditMode ? 'Edit Supplier' : 'Manajemen Supplier'),
-        backgroundColor: Colors.teal,
+        // title: Text(isEditMode ? 'Edit Supplier' : 'Manajemen Supplier'),
+        backgroundColor: Colors.red,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

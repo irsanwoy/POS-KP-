@@ -64,15 +64,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {
-              // TODO: Navigasi ke notifikasi
-            },
-          ),
-        ],
+        // title: const Text('Dashboard'),
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.notifications),
+        //     onPressed: () {
+        //       // TODO: Navigasi ke notifikasi
+        //     },
+        //   ),
+        // ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

@@ -81,8 +81,8 @@ class _HutangScreenState extends State<HutangScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pencatatan Hutang'),
-        backgroundColor: Colors.teal,
+        // title: const Text('Pencatatan Hutang'),
+        backgroundColor: Colors.red,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
