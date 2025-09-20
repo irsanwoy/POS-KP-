@@ -24,7 +24,7 @@ class UserPermissions {
       case 'products':
         return true; // Semua role bisa akses (dengan level berbeda)
       case 'debt':
-        return userRole == KASIR; // Semua role bisa akses (dengan level berbeda)
+        return true; // Semua role bisa akses (dengan level berbeda)
       case 'suppliers':
         return userRole == PEMILIK; // Hanya pemilik
       case 'analytics':
