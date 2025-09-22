@@ -153,7 +153,8 @@ class _HutangScreenState extends State<HutangScreen> {
             await _loadHutang();
           }
         },
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.deepOrange,
+
         child: const Icon(Icons.add),
       ),
     );

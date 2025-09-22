@@ -5,6 +5,7 @@ import '../models/product_model.dart';
 import '../models/transaction_model.dart';
 import '../models/debt_model.dart';
 import '../models/stock_model.dart';
+import 'dart:math';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -636,4 +637,88 @@ Future<int> savePembelianWithStockUpdate(
     ''', [startDate.toIso8601String(), endDate.toIso8601String()]);
     return result.first['total_sales'] as double? ?? 0.0;
   }
+
+  // function buat data dummy
+
+// Tambahkan method ini di class DatabaseHelper
+Future<void> generateBulkSampleData() async {
+  final db = await database;
+  
+  try {
+    // 1. Insert 10 suppliers
+    List<String> supplierNames = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Prima', 'Jaya', 'Maju', 'Sejahtera', 'Makmur', 'Berkah'];
+    for (int i = 1; i <= 10; i++) {
+      await db.insert('suplier', {
+        'nama_suplier': 'Supplier ${supplierNames[i-1]}',
+        'kontak': '0812345678${i.toString().padLeft(2, '0')}',
+        'alamat': 'Jl. Raya No. ${10 + i}'
+      });
+    }
+
+    // 2. Insert 50 products
+    List<String> categories = ['Makanan', 'Minuman', 'Sembako', 'Snack', 'Perlengkapan'];
+    List<String> productNames = [
+      'Indomie Goreng', 'Mie Sedaap', 'Aqua 600ml', 'Teh Botol', 'Beras Premium',
+      'Gula Pasir', 'Minyak Goreng', 'Chitato', 'Tango', 'Oreo',
+      'Susu Bear Brand', 'Kopi ABC', 'Teh Celup', 'Garam', 'Tepung Terigu',
+      'Sabun Mandi', 'Pasta Gigi', 'Shampoo', 'Deterjen', 'Tissue'
+    ];
+    
+    for (int i = 1; i <= 50; i++) {
+      double hargaEcer = (2000 + (i * 500)).toDouble();
+      await db.insert('produk', {
+        'nama_produk': '${productNames[i % productNames.length]} ${i}',
+        'kategori': categories[i % categories.length],
+        'harga_ecer': hargaEcer,
+        'harga_grosir': (hargaEcer * 0.85).round().toDouble(),
+        'stok': Random().nextInt(100) + 10,
+        'barcode': '${1000000000000 + i}',
+        'id_suplier': (i % 10) + 1
+      });
+    }
+
+    // 3. Generate transactions (3 bulan terakhir)
+    for (int i = 1; i <= 200; i++) {
+      DateTime transDate = DateTime.now().subtract(Duration(days: Random().nextInt(90)));
+      double totalHarga = (Random().nextInt(50) + 5) * 1000.0;
+      
+      await db.insert('transaksi', {
+        'tanggal': transDate.toIso8601String(),
+        'total_harga': totalHarga,
+        'metode_bayar': Random().nextBool() ? 'tunai' : 'non-tunai',
+        'status_bayar': 'lunas'
+      });
+      
+      // Detail transaksi (1-3 item per transaksi)
+      int itemCount = Random().nextInt(3) + 1;
+      for (int j = 0; j < itemCount; j++) {
+        int productId = Random().nextInt(50) + 1;
+        int qty = Random().nextInt(5) + 1;
+        double harga = (Random().nextInt(10) + 1) * 1000.0;
+        
+        await db.insert('detail_transaksi', {
+          'id_transaksi': i,
+          'id_produk': productId,
+          'jumlah': qty,
+          'harga_satuan': harga,
+          'subtotal': harga * qty
+        });
+      }
+    }
+
+    // 4. Generate hutang pelanggan
+    for (int i = 1; i <= 15; i++) {
+      await db.insert('hutang_pelanggan', {
+        'nama_pelanggan': 'Pelanggan ${i}',
+        'total_hutang': (Random().nextInt(20) + 5) * 1000.0,
+        'status': Random().nextBool() ? 'lunas' : 'belum lunas',
+        'tanggal_jatuh_tempo': DateTime.now().add(Duration(days: Random().nextInt(30))).toIso8601String()
+      });
+    }
+
+    print('✅ Bulk sample data generated successfully!');
+  } catch (e) {
+    print('❌ Error generating bulk data: $e');
+  }
+}
 }

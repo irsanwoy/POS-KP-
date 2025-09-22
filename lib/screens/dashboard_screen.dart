@@ -74,12 +74,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         //   ),
         // ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Implement scan barcode
-        },
-        child: const Icon(Icons.qr_code_scanner),
-      ),
+      floatingActionButton: FloatingActionButton.extended(
+  onPressed: () async {
+    await _dbHelper.generateBulkSampleData();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Sample data generated!')),
+    );
+  },
+  icon: Icon(Icons.data_usage),
+  label: Text('Generate Data'),
+), // Hapus setelah testing
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

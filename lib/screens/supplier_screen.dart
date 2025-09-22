@@ -61,8 +61,10 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text('Manajemen Supplier'),
-        backgroundColor: Colors.teal,
+        // title: Text('Manajemen Supplier'),
+        // backgroundColor: Colors.teal,
+        backgroundColor: Colors.deepOrange,
+
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -93,7 +95,9 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddDialog(),
-        backgroundColor: Colors.teal,
+
+        backgroundColor: Colors.deepOrange,
+        
         child: Icon(Icons.add, color: Colors.white),
       ),
     );
