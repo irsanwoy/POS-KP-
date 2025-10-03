@@ -305,8 +305,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
         if (newProduct.idProduk == null) {
           await DatabaseHelper().insertProduct(newProduct);
+          ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Produk berhasil ditambahkan')));
         } else {
           await DatabaseHelper().updateProduct(newProduct);
+          ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Produk berhasil diperbarui')));
         }
 
         Navigator.pop(context, true);

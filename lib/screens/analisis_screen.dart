@@ -15,16 +15,24 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
   List<Map<String, dynamic>> _produkTerlaris = [];
   List<Map<String, dynamic>> _produkKurangLaris = [];
   List<Map<String, dynamic>> _produkTidakLaku = [];
-  List<Map<String, dynamic>> _stokMenutipis = [];
+  List<Map<String, dynamic>> _stokMenipis = [];
   
   bool _isLoading = true;
+  String _selectedPeriod = '30 hari terakhir';
   DateTime _startDate = DateTime.now().subtract(Duration(days: 30));
   DateTime _endDate = DateTime.now();
+
+  final Map<String, int> _periodDays = {
+    '7 hari terakhir': 7,
+    '30 hari terakhir': 30,
+    '3 bulan terakhir': 90,
+    '6 bulan terakhir': 180,
+  };
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this); // Pastikan length = 4
+    _tabController = TabController(length: 4, vsync: this);
     _loadAnalisisData();
   }
 
@@ -32,6 +40,16 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _changePeriod(String period) {
+    final days = _periodDays[period] ?? 30;
+    setState(() {
+      _selectedPeriod = period;
+      _startDate = DateTime.now().subtract(Duration(days: days));
+      _endDate = DateTime.now();
+    });
+    _loadAnalisisData();
   }
 
   Future<void> _loadAnalisisData() async {
@@ -171,10 +189,10 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
         ORDER BY p.stok ASC, hari_tersisa ASC
       ''', [_startDate.toIso8601String(), _endDate.toIso8601String()]);
       
-      _stokMenutipis = result;
+      _stokMenipis = result;
     } catch (e) {
       print('Error loading stok menipis: $e');
-      _stokMenutipis = [];
+      _stokMenipis = [];
     }
   }
 
@@ -194,69 +212,23 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
     );
   }
 
-  Future<void> _selectDateRange() async {
-    final DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime.now().subtract(Duration(days: 365)),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _startDate = picked.start;
-        _endDate = picked.end;
-      });
-      _loadAnalisisData();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        // title: Text('Analisis Produk'),
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.date_range),
-            onPressed: _selectDateRange,
-            tooltip: 'Pilih Periode',
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _loadAnalisisData,
-            tooltip: 'Refresh',
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          isScrollable: false,
-          tabs: [
-            Tab(text: 'Terlaris'),
-            Tab(text: 'Kurang Laris'),
-            Tab(text: 'Tidak Laku'),
-            Tab(text: 'Stok Tipis'),
-          ],
-        ),
-      ),
+      backgroundColor: Colors.grey[50],
       body: Column(
         children: [
-          _buildPeriodeInfo(),
+          _buildHeaderSection(),
           Expanded(
             child: _isLoading
-                ? Center(child: CircularProgressIndicator(color: Colors.red))
+                ? _buildLoadingState()
                 : TabBarView(
                     controller: _tabController,
                     children: [
                       _buildProdukTerlarisTab(),
                       _buildProdukKurangLarisTab(),
                       _buildProdukTidakLakuTab(),
-                      _buildStokMenimpisTab(),
+                      _buildStokMenipisTab(),
                     ],
                   ),
           ),
@@ -265,52 +237,223 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildPeriodeInfo() {
+  Widget _buildHeaderSection() {
     return Container(
-      padding: EdgeInsets.all(16),
-      color: Colors.grey[100],
-      width: double.infinity,
-      child: Text(
-        'Periode: ${_formatDate(_startDate)} - ${_formatDate(_endDate)}',
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: Colors.grey[600],
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Period Selector
+          
+          // Summary Stats
+          // _buildSummaryStats(),
+          // Tab Bar
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              indicatorColor: Colors.white,
+              indicatorWeight: 3,
+              labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              tabs: [
+                Tab(
+                  icon: Icon(Icons.trending_up, size: 18),
+                  text: 'Terlaris',
+                ),
+                Tab(
+                  icon: Icon(Icons.trending_down, size: 18),
+                  text: 'Kurang',
+                ),
+                Tab(
+                  icon: Icon(Icons.block, size: 18),
+                  text: 'Tidak Laku',
+                ),
+                Tab(
+                  icon: Icon(Icons.warning, size: 18),
+                  text: 'Stok Tipis',
+                ),
+              ],
+            ),
+            
+          ),
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.date_range, color: Colors.red, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Periode Analisis:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red[200]!),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedPeriod,
+                        isExpanded: true,
+                        icon: Icon(Icons.keyboard_arrow_down, color: Colors.red),
+                        items: _periodDays.keys.map((String period) {
+                          return DropdownMenuItem<String>(
+                            value: period,
+                            child: Text(
+                              period,
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            _changePeriod(newValue);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Widget _buildSummaryStats() {
+  //   return Container(
+  //     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  //     child: Row(
+  //       children: [
+  //         _buildStatCard('Produk Terlaris', _produkTerlaris.length.toString(), Colors.green, Icons.trending_up),
+  //         SizedBox(width: 12),
+  //         _buildStatCard('Kurang Laris', _produkKurangLaris.length.toString(), Colors.orange, Icons.trending_down),
+  //         SizedBox(width: 12),
+  //         _buildStatCard('Tidak Laku', _produkTidakLaku.length.toString(), Colors.red, Icons.block),
+  //         SizedBox(width: 12),
+  //         _buildStatCard('Stok Tipis', _stokMenipis.length.toString(), Colors.blue, Icons.warning),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  Widget _buildStatCard(String title, String value, Color color, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
-        textAlign: TextAlign.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 16),
+                SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: color,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: Colors.red,
+            strokeWidth: 3,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Memuat data analisis...',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 16,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildProdukTerlarisTab() {
     if (_produkTerlaris.isEmpty) {
-      return _buildEmptyState('Tidak ada data produk terlaris');
+      return _buildEmptyState('Tidak ada data produk terlaris', Icons.trending_up);
     }
 
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          color: Colors.green[50],
-          width: double.infinity,
-          child: Row(
-            children: [
-              Icon(Icons.trending_up, color: Colors.green[600]),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Rekomendasi: Tambah stok untuk produk-produk ini',
-                  style: TextStyle(
-                    color: Colors.green[800],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildRecommendationHeader(
+            'Rekomendasi: Tambah stok untuk produk-produk ini',
+            Colors.green,
+            Icons.trending_up,
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             itemCount: _produkTerlaris.length,
             itemBuilder: (context, index) {
               final produk = _produkTerlaris[index];
@@ -320,43 +463,34 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
                 icon: Icons.trending_up,
                 showRecommendation: true,
                 recommendationType: 'TAMBAH STOK',
+                rank: index + 1,
               );
             },
           ),
-        ),
-      ],
+          SizedBox(height: 20), // Extra bottom padding
+        ],
+      ),
     );
   }
 
   Widget _buildProdukKurangLarisTab() {
     if (_produkKurangLaris.isEmpty) {
-      return _buildEmptyState('Tidak ada data produk kurang laris');
+      return _buildEmptyState('Tidak ada data produk kurang laris', Icons.trending_down);
     }
 
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          color: Colors.orange[50],
-          width: double.infinity,
-          child: Row(
-            children: [
-              Icon(Icons.trending_down, color: Colors.orange[600]),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Rekomendasi: Kurangi pembelian untuk produk-produk ini',
-                  style: TextStyle(
-                    color: Colors.orange[800],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildRecommendationHeader(
+            'Rekomendasi: Kurangi pembelian untuk produk-produk ini',
+            Colors.orange,
+            Icons.trending_down,
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             itemCount: _produkKurangLaris.length,
             itemBuilder: (context, index) {
               final produk = _produkKurangLaris[index];
@@ -369,40 +503,30 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
               );
             },
           ),
-        ),
-      ],
+          SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
   Widget _buildProdukTidakLakuTab() {
     if (_produkTidakLaku.isEmpty) {
-      return _buildEmptyState('Semua produk ada yang terjual dalam periode ini');
+      return _buildEmptyState('Semua produk ada yang terjual dalam periode ini', Icons.check_circle);
     }
 
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          color: Colors.red[50],
-          width: double.infinity,
-          child: Row(
-            children: [
-              Icon(Icons.block, color: Colors.red[600]),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Rekomendasi: Jangan beli lagi atau ganti produk',
-                  style: TextStyle(
-                    color: Colors.red[800],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildRecommendationHeader(
+            'Rekomendasi: Jangan beli lagi atau ganti produk',
+            Colors.red,
+            Icons.block,
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             itemCount: _produkTidakLaku.length,
             itemBuilder: (context, index) {
               final produk = _produkTidakLaku[index];
@@ -415,43 +539,33 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
               );
             },
           ),
-        ),
-      ],
+          SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
-  Widget _buildStokMenimpisTab() {
-    if (_stokMenutipis.isEmpty) {
-      return _buildEmptyState('Tidak ada produk dengan stok menipis');
+  Widget _buildStokMenipisTab() {
+    if (_stokMenipis.isEmpty) {
+      return _buildEmptyState('Tidak ada produk dengan stok menipis', Icons.inventory_2);
     }
 
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          color: Colors.blue[50],
-          width: double.infinity,
-          child: Row(
-            children: [
-              Icon(Icons.warning, color: Colors.blue[600]),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Rekomendasi: Segera restok produk-produk ini',
-                  style: TextStyle(
-                    color: Colors.blue[800],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildRecommendationHeader(
+            'Rekomendasi: Segera restok produk-produk ini',
+            Colors.blue,
+            Icons.warning,
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _stokMenutipis.length,
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _stokMenipis.length,
             itemBuilder: (context, index) {
-              final produk = _stokMenutipis[index];
+              final produk = _stokMenipis[index];
               return _buildProdukCard(
                 produk: produk,
                 color: Colors.blue,
@@ -461,132 +575,212 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
               );
             },
           ),
-        ),
-      ],
+          SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
   Widget _buildProdukCard({
     required Map<String, dynamic> produk,
-    required MaterialColor color, // Ganti dari Color ke MaterialColor
+    required MaterialColor color,
     required IconData icon,
     bool showRecommendation = false,
     String? recommendationType,
+    int? rank,
   }) {
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color[600], size: 20), // Sekarang bisa akses color[600]
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    produk['nama_produk'] ?? '',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Gradient accent
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 4,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color[400]!, color[600]!],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
-                if (showRecommendation && recommendationType != null)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: color[50], // Sekarang bisa akses color[50]
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: color[200]!), // Sekarang bisa akses color[200]
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (rank != null) ...[
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '#$rank',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                    ],
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: color, size: 16),
                     ),
-                    child: Text(
-                      recommendationType,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: color[800], // Sekarang bisa akses color[800]
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            produk['nama_produk'] ?? '',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                          Text(
+                            produk['kategori'] ?? 'Tidak ada kategori',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Kategori: ${produk['kategori'] ?? 'Tidak ada'}',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildInfoItem(
-                    'Stok',
-                    '${produk['stok'] ?? 0}',
-                    (produk['stok'] ?? 0) <= 5 ? Colors.red : Colors.black,
-                  ),
-                ),
-                Expanded(
-                  child: _buildInfoItem(
-                    'Terjual',
-                    '${produk['total_terjual'] ?? 0}',
-                    Colors.black,
-                  ),
-                ),
-                Expanded(
-                  child: _buildInfoItem(
-                    'Harga',
-                    _formatCurrency(produk['harga_ecer'] ?? 0),
-                    Colors.black,
-                  ),
-                ),
-              ],
-            ),
-            if (produk['hari_tersisa'] != null && 
-                produk['hari_tersisa'] is num && 
-                produk['hari_tersisa'] < 30 && 
-                produk['hari_tersisa'] != 999) ...[
-              SizedBox(height: 8),
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.yellow[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.yellow[300]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.access_time, color: Colors.orange, size: 16),
-                    SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'Perkiraan habis dalam ${produk['hari_tersisa']} hari',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.orange[800],
-                          fontWeight: FontWeight.w500,
+                    if (showRecommendation && recommendationType != null)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Text(
+                          recommendationType,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatItem(
+                        'Stok',
+                        '${produk['stok'] ?? 0}',
+                        Icons.inventory_2_outlined,
+                        (produk['stok'] ?? 0) <= 5 ? Colors.red : Colors.grey[700]!,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildStatItem(
+                        'Terjual',
+                        '${produk['total_terjual'] ?? 0}',
+                        Icons.shopping_cart_outlined,
+                        color,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildStatItem(
+                        'Harga',
+                        _formatCurrency(produk['harga_ecer'] ?? 0),
+                        Icons.attach_money_outlined,
+                        Colors.grey[700]!,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ],
-        ),
+                if (produk['hari_tersisa'] != null && 
+                    produk['hari_tersisa'] is num && 
+                    produk['hari_tersisa'] < 30 && 
+                    produk['hari_tersisa'] != 999) ...[
+                  SizedBox(height: 12),
+                  Container(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.orange[50]!, Colors.yellow[50]!],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.access_time, color: Colors.orange[600], size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Perkiraan habis dalam ${produk['hari_tersisa']} hari',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange[800],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildInfoItem(String label, String value, Color color) {
+  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Icon(icon, color: color, size: 16),
+        SizedBox(height: 4),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             color: Colors.grey[600],
           ),
         ),
@@ -595,7 +789,7 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
           value,
           style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.bold,
             color: color,
           ),
         ),
@@ -603,22 +797,78 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildEmptyState(String message) {
+  Widget _buildRecommendationHeader(String text, MaterialColor color, IconData icon) {
+    return Container(
+      margin: EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color[50]!, color[100]!],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color[200]!),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 16),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: color[800],
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String message, IconData icon) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: Colors.grey[400],
+          Container(
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 48,
+              color: Colors.grey[400],
+            ),
           ),
-          SizedBox(height: 16),
+          SizedBox(height: 24),
           Text(
             message,
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Coba ubah periode analisis atau refresh data',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
             ),
             textAlign: TextAlign.center,
           ),
@@ -627,12 +877,10 @@ class _AnalisisScreenState extends State<AnalisisScreen> with SingleTickerProvid
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
   String _formatCurrency(dynamic amount) {
-    return 'Rp ${(amount ?? 0).toString().replaceAllMapped(
+    if (amount == null) return 'Rp 0';
+    final value = amount is String ? double.tryParse(amount) ?? 0 : amount.toDouble();
+    return 'Rp ${value.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]}.',
     )}';

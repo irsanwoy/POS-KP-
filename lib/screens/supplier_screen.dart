@@ -67,22 +67,19 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
 
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
-        ],
+        
         bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: [
-            Tab(icon: Icon(Icons.business), text: 'Supplier'),
-            Tab(icon: Icon(Icons.shopping_cart), text: 'Pembelian'),
-          ],
-        ),
+        controller: _tabController,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        indicatorColor: Colors.white,
+        labelPadding: EdgeInsets.symmetric(vertical: 2),
+        indicatorPadding: EdgeInsets.zero,
+        tabs: [
+          Tab(icon: Icon(Icons.business, size: 20), text: 'Supplier'),
+          Tab(icon: Icon(Icons.shopping_cart, size: 20), text: 'Pembelian'),
+        ],
+      ),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: Colors.teal))
@@ -341,6 +338,9 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
                   alamat: alamatController.text.isEmpty ? null : alamatController.text,
                 );
                 await _dbHelper.insertSupplier(supplier);
+                 ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Supplier berhasil ditambahkan'))
+        );
                 Navigator.pop(context);
                 _loadData();
               }
