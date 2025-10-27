@@ -72,29 +72,85 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   void _showScanOptionDialog() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: Icon(Icons.qr_code_scanner),
-            title: Text('Scan dengan Kamera'),
-            onTap: () {
-              Navigator.pop(context);
-              _scanBarcode();
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.keyboard),
-            title: Text('Scan dengan Scanner Fisik'),
-            onTap: () {
-              Navigator.pop(context);
-              _barcodeFocusNode.requestFocus();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Siap menerima input dari scanner fisik')),
-              );
-            },
-          ),
-        ],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Pilih Metode Scan',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20),
+            ListTile(
+              leading: Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.qr_code_scanner, color: Colors.blue[700]),
+              ),
+              title: Text(
+                'Scan dengan Kamera',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text('Gunakan kamera untuk scan barcode'),
+              onTap: () {
+                Navigator.pop(context);
+                _scanBarcode();
+              },
+            ),
+            SizedBox(height: 10),
+            ListTile(
+              leading: Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.keyboard, color: Colors.green[700]),
+              ),
+              title: Text(
+                'Scanner Fisik',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text('Gunakan barcode scanner eksternal'),
+              onTap: () {
+                Navigator.pop(context);
+                _barcodeFocusNode.requestFocus();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.white),
+                        SizedBox(width: 10),
+                        Text('Siap menerima input dari scanner fisik'),
+                      ],
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+            ),
+            SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -123,7 +179,10 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
 
     if (cleaned.isEmpty || cleaned.length < 4) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Barcode tidak valid atau kosong')),
+        SnackBar(
+          content: Text('Barcode tidak valid atau kosong'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -131,9 +190,19 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     final product = await _dbHelper.getProductByBarcode(cleaned);
     if (product != null) {
       _addToCart(product, quantity);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${product.namaProduk} ditambahkan ke keranjang'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Produk tidak ditemukan: $cleaned')),
+        SnackBar(
+          content: Text('Produk tidak ditemukan: $cleaned'),
+          backgroundColor: Colors.orange,
+        ),
       );
     }
   }
@@ -157,8 +226,12 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
 
   Future<void> _saveTransaction() async {
     if (_cart.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Keranjang kosong')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Keranjang kosong'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
@@ -194,7 +267,16 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Transaksi berhasil disimpan')),
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 10),
+              Text('Transaksi berhasil disimpan'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
 
       setState(() {
@@ -204,7 +286,10 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     } catch (e) {
       debugPrint("Error saat menyimpan transaksi: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menyimpan transaksi: $e')),
+        SnackBar(
+          content: Text('Gagal menyimpan transaksi: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -251,10 +336,21 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Preview Struk'),
+        title: Row(
+          children: [
+            Icon(Icons.receipt_long, color: Colors.blue),
+            SizedBox(width: 10),
+            Text('Preview Struk'),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Container(
             width: double.maxFinite,
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Text(
               receiptText,
               style: TextStyle(
@@ -269,18 +365,88 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
             onPressed: () => Navigator.of(context).pop(),
             child: Text('Tutup'),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: receiptText));
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Struk berhasil disalin ke clipboard!')),
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white),
+                      SizedBox(width: 10),
+                      Text('Struk berhasil disalin ke clipboard!'),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
+              backgroundColor: Colors.blue,
             ),
-            child: Text('Salin ke Clipboard'),
+            icon: Icon(Icons.copy),
+            label: Text('Salin'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyCart() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.shopping_cart_outlined,
+              size: 80,
+              color: Colors.blue[300],
+            ),
+          ),
+          SizedBox(height: 24),
+          Text(
+            'Keranjang Kosong',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Scan barcode untuk menambah produk',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+          SizedBox(height: 40),
+          // Tombol Scan Besar
+          ElevatedButton.icon(
+            onPressed: _showScanOptionDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              padding: EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              elevation: 4,
+            ),
+            icon: Icon(Icons.qr_code_scanner, size: 28),
+            label: Text(
+              'Scan Barcode',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -291,14 +457,6 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Scan Barcode'),
-        backgroundColor: Colors.red,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.qr_code_scanner),
-            onPressed: _showScanOptionDialog,
-          ),
-        ],
       ),
       body: RawKeyboardListener(
         focusNode: _barcodeFocusNode,
@@ -327,7 +485,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 color: _isWholesaleMode ? Colors.orange[50] : Colors.blue[50],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _isWholesaleMode ? Colors.orange[200]! : Colors.blue[200]!,
+                  color: _isWholesaleMode ? Colors.orange.shade300 : Colors.blue.shade300,
                   width: 1.5,
                 ),
               ),
@@ -335,7 +493,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 children: [
                   Icon(
                     _isWholesaleMode ? Icons.business : Icons.person,
-                    color: _isWholesaleMode ? Colors.orange[700] : Colors.blue[700],
+                    color: _isWholesaleMode ? Colors.orange.shade700 : Colors.blue.shade700,
                     size: 24,
                   ),
                   SizedBox(width: 12),
@@ -356,7 +514,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: _isWholesaleMode ? Colors.orange[800] : Colors.blue[800],
+                            color: _isWholesaleMode ? Colors.orange.shade800 : Colors.blue.shade800,
                           ),
                         ),
                       ],
@@ -377,241 +535,276 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
               ),
             ),
 
-            // Cart items
+            // Cart items atau Empty State
             Expanded(
-              child: ListView.builder(
-                itemCount: _cart.length,
-                itemBuilder: (context, index) {
-                  final item = _cart[index];
-                  final grosir = item.product.hargaGrosir ?? 0;
-                  final eceran = item.product.hargaEcer;
-                  final isUsingGrosir = item.useWholesalePrice;
-                  
-                  return Card(
-                    elevation: 4,
-                    margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: isUsingGrosir 
-                            ? Border.all(color: Colors.orange[300]!, width: 2)
-                            : Border.all(color: Colors.grey[200]!, width: 1),
-                      ),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.all(16),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.product.namaProduk ?? '', 
-                                style: TextStyle(fontWeight: FontWeight.bold),
+              child: _cart.isEmpty 
+                  ? _buildEmptyCart()
+                  : Column(
+                      children: [
+                        // Tombol Scan ketika ada item di cart
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _showScanOptionDialog,
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                side: BorderSide(color: Colors.blue, width: 2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: Icon(Icons.qr_code_scanner, color: Colors.blue),
+                              label: Text(
+                                'Scan Produk Lain',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue,
+                                ),
                               ),
                             ),
-                            if (isUsingGrosir)
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange[100],
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: _cart.length,
+                            itemBuilder: (context, index) {
+                              final item = _cart[index];
+                              final grosir = item.product.hargaGrosir ?? 0;
+                              final eceran = item.product.hargaEcer;
+                              final isUsingGrosir = item.useWholesalePrice;
+                              
+                              return Card(
+                                elevation: 2,
+                                margin: EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+                                shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Text(
-                                  'GROSIR',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange[800],
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: isUsingGrosir 
+                                        ? Border.all(color: Colors.orange.shade300, width: 2)
+                                        : Border.all(color: Colors.grey.shade200, width: 1),
                                   ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: 8),
-                            Text('Jumlah: ${item.quantity}'),
-                            Text(
-                              'Harga: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.currentPrice)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: isUsingGrosir ? Colors.orange[700] : Colors.blue[700],
-                              ),
-                            ),
-                            Text(
-                              'Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.subtotal)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Eceran: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(eceran)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: !isUsingGrosir ? Colors.blue[600] : Colors.grey[600],
-                                      fontWeight: !isUsingGrosir ? FontWeight.w600 : FontWeight.normal,
+                                  child: ListTile(
+                                    contentPadding: EdgeInsets.all(16),
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item.product.namaProduk ?? '', 
+                                            style: TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        if (isUsingGrosir)
+                                          Container(
+                                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.shade100,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              'GROSIR',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.orange.shade800,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        SizedBox(height: 8),
+                                        Text('Jumlah: ${item.quantity}'),
+                                        Text(
+                                          'Harga: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.currentPrice)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: isUsingGrosir ? Colors.orange.shade700 : Colors.blue.shade700,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.subtotal)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                'Eceran: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(eceran)}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: !isUsingGrosir ? Colors.blue.shade600 : Colors.grey[600],
+                                                  fontWeight: !isUsingGrosir ? FontWeight.w600 : FontWeight.normal,
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Text(
+                                                'Grosir: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(grosir)}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: isUsingGrosir ? Colors.orange.shade600 : Colors.grey[600],
+                                                  fontWeight: isUsingGrosir ? FontWeight.w600 : FontWeight.normal,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    trailing: IconButton(
+                                      icon: Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () {
+                                        setState(() {
+                                          _cart.removeAt(index);
+                                        });
+                                      },
                                     ),
                                   ),
                                 ),
-                                Expanded(
-                                  child: Text(
-                                    'Grosir: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(grosir)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isUsingGrosir ? Colors.orange[600] : Colors.grey[600],
-                                      fontWeight: isUsingGrosir ? FontWeight.w600 : FontWeight.normal,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                              );
+                            },
+                          ),
                         ),
-                        trailing: IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            setState(() {
-                              _cart.removeAt(index);
-                            });
-                          },
-                        ),
-                      ),
+                      ],
                     ),
-                  );
-                },
-              ),
             ),
 
-            // Total section
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.teal.shade50,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Total Pembayaran',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      Text(
-                        '(${_isWholesaleMode ? "Harga Grosir" : "Harga Eceran"})',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _isWholesaleMode ? Colors.orange[600] : Colors.blue[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(_total),
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.teal[700],
+            // Total section - hanya tampil jika ada item di cart
+            if (_cart.isNotEmpty)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 1,
+                      blurRadius: 5,
+                      offset: Offset(0, -2),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Pembayaran',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          '(${_isWholesaleMode ? "Harga Grosir" : "Harga Eceran"})',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _isWholesaleMode ? Colors.orange.shade600 : Colors.blue.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(_total),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal.shade700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // Buttons section
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Row pertama: Batal dan Simpan
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+            // Buttons section - hanya tampil jika ada item di cart
+            if (_cart.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () => setState(() {
+                              _cart.clear();
+                              _lastTransactionId = null;
+                              _isWholesaleMode = false;
+                            }),
+                            icon: Icon(Icons.cancel),
+                            label: Text(
+                              'Batal',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                           ),
-                          onPressed: () => setState(() {
-                            _cart.clear();
-                            _lastTransactionId = null;
-                            _isWholesaleMode = false;
-                          }),
-                          child: Text(
-                            'Batal',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
                         ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: _saveTransaction,
+                            icon: Icon(Icons.check_circle),
+                            label: Text(
+                              'Simpan',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                           ),
-                          onPressed: _cart.isNotEmpty ? _saveTransaction : null,
-                          child: Text(
-                            'Simpan',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  // Row kedua: Print Struk (full width)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                        onPressed: _showReceiptPreview,
+                        icon: Icon(Icons.receipt_long),
+                        label: Text(
+                          'Print Struk',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
-                      ),
-                      onPressed: _cart.isNotEmpty || _lastTransactionId != null 
-                          ? _showReceiptPreview 
-                          : null,
-                      icon: Icon(Icons.receipt_long),
-                      label: Text(
-                        'Print Struk',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -641,21 +834,61 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Pindai Barcode')),
-      body: MobileScanner(
-        controller: _controller,
-        onDetect: (capture) {
-          if (_hasScanned) return;
-          final barcode = capture.barcodes.first.rawValue;
+      appBar: AppBar(
+        title: Text('Pindai Barcode'),
+        backgroundColor: Colors.red,
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: (capture) {
+              if (_hasScanned) return;
+              final barcode = capture.barcodes.first.rawValue;
 
-          if (barcode != null && barcode.isNotEmpty) {
-            debugPrint('Barcode terdeteksi: $barcode');
-            _hasScanned = true;
-            widget.onScanResult(barcode);
-          } else {
-            debugPrint('Barcode tidak valid');
-          }
-        },
+              if (barcode != null && barcode.isNotEmpty) {
+                debugPrint('Barcode terdeteksi: $barcode');
+                _hasScanned = true;
+                widget.onScanResult(barcode);
+              } else {
+                debugPrint('Barcode tidak valid');
+              }
+            },
+          ),
+          // Overlay dengan frame
+          Center(
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white, width: 3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          // Instruksi
+          Positioned(
+            bottom: 50,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Arahkan kamera ke barcode',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

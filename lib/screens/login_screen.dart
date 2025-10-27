@@ -35,7 +35,6 @@ class _LoginScreenState extends State<LoginScreen> {
   });
 
   try {
-    // Query langsung ke database tanpa method khusus
     final db = await _databaseHelper.database;
     final List<Map<String, dynamic>> result = await db.query(
       'users',
@@ -48,14 +47,12 @@ class _LoginScreenState extends State<LoginScreen> {
       // Login berhasil
       _showSuccessSnackBar('Login berhasil!');
       
-      // Navigate berdasarkan role
       if (user['role'] == 'pemilik') {
         Navigator.pushReplacementNamed(context, '/owner_dashboard');
       } else if (user['role'] == 'kasir') {
         Navigator.pushReplacementNamed(context, '/cashier_dashboard');
       }
     } else {
-      // Login gagal
       _showErrorSnackBar('Username atau password salah!');
     }
   } catch (e) {
@@ -101,22 +98,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo dan Nama Aplikasi
                   _buildHeader(),
                   
                   const SizedBox(height: 60),
                   
-                  // Form Login
                   _buildLoginForm(),
                   
                   const SizedBox(height: 24),
                   
-                  // Tombol Login
                   _buildLoginButton(),
                   
                   const SizedBox(height: 20),
                   
-                  // Info Default User
                 ],
               ),
             ),
@@ -129,7 +122,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        // Logo
         Container(
           width: 80,
           height: 80,
@@ -146,7 +138,6 @@ class _LoginScreenState extends State<LoginScreen> {
         
         const SizedBox(height: 16),
         
-        // Nama Aplikasi
         const Text(
           'SRC Rudi',
           style: TextStyle(

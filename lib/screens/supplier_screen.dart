@@ -13,8 +13,7 @@ class SupplierScreen extends StatefulWidget {
   State<SupplierScreen> createState() => _SupplierScreenState();
 }
 
-class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _SupplierScreenState extends State<SupplierScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   
   List<Supplier> _suppliers = [];
@@ -22,18 +21,12 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
   List<Product> _products = [];
   
   bool _isLoading = true;
+  String _selectedView = 'supplier'; // 'supplier' atau 'pembelian'
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this); // Hanya 2 tab
     _loadData();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -59,369 +52,608 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        // title: Text('Manajemen Supplier'),
-        // backgroundColor: Colors.teal,
-        backgroundColor: Colors.deepOrange,
-
-        foregroundColor: Colors.white,
-        elevation: 0,
-        
-        bottom: TabBar(
-        controller: _tabController,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white70,
-        indicatorColor: Colors.white,
-        labelPadding: EdgeInsets.symmetric(vertical: 2),
-        indicatorPadding: EdgeInsets.zero,
-        tabs: [
-          Tab(icon: Icon(Icons.business, size: 20), text: 'Supplier'),
-          Tab(icon: Icon(Icons.shopping_cart, size: 20), text: 'Pembelian'),
-        ],
-      ),
-      ),
+    
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: Colors.teal))
-          : TabBarView(
-              controller: _tabController,
+          ? Center(child: CircularProgressIndicator(color: Colors.deepOrange))
+          : Column(
               children: [
-                _buildSuppliersTab(),
-                _buildPembelianTab(),
+                // Segmented Button untuk Switch View
+                Container(
+                  margin: EdgeInsets.all(16),
+                  padding: EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildSegmentButton(
+                          label: 'Supplier',
+                          icon: Icons.business,
+                          isSelected: _selectedView == 'supplier',
+                          onTap: () {
+                            setState(() {
+                              _selectedView = 'supplier';
+                            });
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Expanded(
+                        child: _buildSegmentButton(
+                          label: 'Pembelian',
+                          icon: Icons.shopping_cart,
+                          isSelected: _selectedView == 'pembelian',
+                          onTap: () {
+                            setState(() {
+                              _selectedView = 'pembelian';
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content
+                Expanded(
+                  child: _selectedView == 'supplier'
+                      ? _buildSuppliersView()
+                      : _buildPembelianView(),
+                ),
               ],
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDialog(),
-
+        onPressed: () {
+          if (_selectedView == 'supplier') {
+            _showSupplierDialog();
+          } else {
+            _showPembelianDialog();
+          }
+        },
         backgroundColor: Colors.deepOrange,
-        
-        child: Icon(Icons.add, color: Colors.white),
+        child: Icon(Icons.add, color: Colors.black),
       ),
     );
   }
 
-  Widget _buildSuppliersTab() {
-    return Column(
-      children: [
-        // Header
-        Container(
-          margin: EdgeInsets.all(16),
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.teal,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.business, color: Colors.white, size: 32),
-              SizedBox(width: 16),
-              Text(
-                'Total Supplier: ${_suppliers.length}',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+  Widget _buildSegmentButton({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.deepOrange : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
-        
-        // List Suppliers
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _suppliers.length,
-            itemBuilder: (context, index) {
-              final supplier = _suppliers[index];
-              return Card(
-                margin: EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.teal[100],
-                    child: Icon(Icons.business, color: Colors.teal),
-                  ),
-                  title: Text(
-                    supplier.namaSuplier,
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (supplier.kontak != null)
-                        Text('📞 ${supplier.kontak}'),
-                      if (supplier.alamat != null)
-                        Text('📍 ${supplier.alamat}'),
-                    ],
-                  ),
-                  trailing: PopupMenuButton(
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, color: Colors.blue),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Hapus'),
-                          ],
-                        ),
-                      ),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _editSupplier(supplier);
-                      } else if (value == 'delete') {
-                        _deleteSupplier(supplier);
-                      }
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPembelianTab() {
-    return Column(
-      children: [
-        // Header
-        Container(
-          margin: EdgeInsets.all(16),
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.orange,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.shopping_cart, color: Colors.white, size: 32),
-              SizedBox(width: 16),
-              Text(
-                'Total Pembelian: ${_pembelianSuplier.length}',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        
-        // List Pembelian
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _pembelianSuplier.length,
-            itemBuilder: (context, index) {
-              final pembelian = _pembelianSuplier[index];
-              final tanggal = DateTime.parse(pembelian['tanggal_pembelian']);
-              final status = pembelian['status_bayar'];
-              
-              Color statusColor = status == 'lunas' 
-                  ? Colors.green 
-                  : status == 'terlambat' 
-                    ? Colors.red 
-                    : Colors.orange;
-
-              return Card(
-                margin: EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: statusColor.withOpacity(0.2),
-                    child: Text('PB', style: TextStyle(color: statusColor)),
-                  ),
-                  title: Text(
-                    'PB-${pembelian['id_pembelian']} - ${pembelian['nama_suplier']}',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('📅 ${DateFormat('dd/MM/yyyy').format(tanggal)}'),
-                      Text('📦 ${pembelian['total_items']} items'),
-                      Text('💰 ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(pembelian['total_harga'])}'),
-                    ],
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          status.toUpperCase(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (status != 'lunas')
-                        IconButton(
-                          icon: Icon(Icons.payment, color: Colors.green),
-                          onPressed: () => _markAsPaid(pembelian['id_pembelian']),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showAddDialog() {
-    if (_tabController.index == 0) {
-      _addSupplier();
-    } else {
-      _addPembelian();
-    }
-  }
-
-  void _addSupplier() {
-    final namaController = TextEditingController();
-    final kontakController = TextEditingController();
-    final alamatController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Tambah Supplier'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextField(
-              controller: namaController,
-              decoration: InputDecoration(labelText: 'Nama Supplier'),
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey[700],
             ),
-            TextField(
-              controller: kontakController,
-              decoration: InputDecoration(labelText: 'Kontak'),
-            ),
-            TextField(
-              controller: alamatController,
-              decoration: InputDecoration(labelText: 'Alamat'),
+            SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[700],
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Batal'),
+      ),
+    );
+  }
+
+  Widget _buildSuppliersView() {
+    if (_suppliers.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.business_outlined, size: 80, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Belum ada supplier',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _suppliers.length,
+      itemBuilder: (context, index) {
+        final supplier = _suppliers[index];
+        return Card(
+          margin: EdgeInsets.only(bottom: 12),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (namaController.text.isNotEmpty) {
-                final supplier = Supplier(
-                  namaSuplier: namaController.text,
-                  kontak: kontakController.text.isEmpty ? null : kontakController.text,
-                  alamat: alamatController.text.isEmpty ? null : alamatController.text,
-                );
-                await _dbHelper.insertSupplier(supplier);
-                 ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Supplier berhasil ditambahkan'))
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.business,
+                        color: Colors.deepOrange,
+                        size: 24,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        supplier.namaSuplier,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.edit, color: Colors.blue),
+                      onPressed: () => _editSupplier(supplier),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _deleteSupplier(supplier),
+                    ),
+                  ],
+                ),
+                if (supplier.kontak != null || supplier.alamat != null) ...[
+                  SizedBox(height: 8),
+                  if (supplier.kontak != null)
+                    Row(
+                      children: [
+                        Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                        SizedBox(width: 8),
+                        Text(
+                          supplier.kontak!,
+                          style: TextStyle(color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  if (supplier.alamat != null) ...[
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            supplier.alamat!,
+                            style: TextStyle(color: Colors.grey[700]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
         );
-                Navigator.pop(context);
-                _loadData();
-              }
-            },
-            child: Text('Simpan'),
+      },
+    );
+  }
+
+  Widget _buildPembelianView() {
+    if (_pembelianSuplier.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Belum ada pembelian',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _pembelianSuplier.length,
+      itemBuilder: (context, index) {
+        final pembelian = _pembelianSuplier[index];
+        final tanggal = DateTime.parse(pembelian['tanggal_pembelian']);
+        final status = pembelian['status_bayar'];
+        
+        Color statusColor = status == 'lunas' 
+            ? Colors.green 
+            : status == 'terlambat' 
+              ? Colors.red 
+              : Colors.orange;
+
+        return Card(
+          margin: EdgeInsets.only(bottom: 12),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.shopping_cart,
+                        color: statusColor,
+                        size: 24,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'PB-${pembelian['id_pembelian']}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            pembelian['nama_suplier'],
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                    SizedBox(width: 4),
+                    Text(
+                      DateFormat('dd/MM/yyyy').format(tanggal),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                    SizedBox(width: 16),
+                    Icon(Icons.inventory_2, size: 14, color: Colors.grey[600]),
+                    SizedBox(width: 4),
+                    Text(
+                      '${pembelian['total_items']} items',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0)
+                          .format(pembelian['total_harga']),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.deepOrange,
+                      ),
+                    ),
+                    if (status != 'lunas')
+                      TextButton.icon(
+                        onPressed: () => _markAsPaid(pembelian['id_pembelian']),
+                        icon: Icon(Icons.payment, size: 16),
+                        label: Text('Bayar'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.green,
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSupplierDialog({Supplier? supplier}) {
+    final namaController = TextEditingController(text: supplier?.namaSuplier ?? '');
+    final kontakController = TextEditingController(text: supplier?.kontak ?? '');
+    final alamatController = TextEditingController(text: supplier?.alamat ?? '');
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        supplier == null ? Icons.add_business : Icons.business,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        supplier == null ? 'Tambah Supplier' : 'Edit Supplier',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Form
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextFormField(
+                            controller: namaController,
+                            decoration: InputDecoration(
+                              labelText: 'Nama Supplier',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              prefixIcon: Icon(Icons.business),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Nama supplier wajib diisi';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: kontakController,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              labelText: 'Kontak (Opsional)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              prefixIcon: Icon(Icons.phone),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: alamatController,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              labelText: 'Alamat (Opsional)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              prefixIcon: Icon(Icons.location_on),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Buttons
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: isLoading ? null : () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Text('Batal'),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  if (!formKey.currentState!.validate()) return;
+
+                                  setStateDialog(() {
+                                    isLoading = true;
+                                  });
+
+                                  try {
+                                    if (supplier == null) {
+                                      // Add new
+                                      final newSupplier = Supplier(
+                                        namaSuplier: namaController.text.trim(),
+                                        kontak: kontakController.text.isEmpty ? null : kontakController.text.trim(),
+                                        alamat: alamatController.text.isEmpty ? null : alamatController.text.trim(),
+                                      );
+                                      await _dbHelper.insertSupplier(newSupplier);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Supplier berhasil ditambahkan'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    } else {
+                                      // Update existing
+                                      final updatedSupplier = Supplier(
+                                        idSuplier: supplier.idSuplier,
+                                        namaSuplier: namaController.text.trim(),
+                                        kontak: kontakController.text.isEmpty ? null : kontakController.text.trim(),
+                                        alamat: alamatController.text.isEmpty ? null : alamatController.text.trim(),
+                                      );
+                                      await _dbHelper.updateSupplier(updatedSupplier);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Supplier berhasil diperbarui'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    }
+
+                                    Navigator.pop(context);
+                                    _loadData();
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Gagal menyimpan supplier: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  } finally {
+                                    setStateDialog(() {
+                                      isLoading = false;
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepOrange,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: isLoading
+                              ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                                  ),
+                                )
+                              : Text(
+                                  'Simpan',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
   void _editSupplier(Supplier supplier) {
-    final namaController = TextEditingController(text: supplier.namaSuplier);
-    final kontakController = TextEditingController(text: supplier.kontak ?? '');
-    final alamatController = TextEditingController(text: supplier.alamat ?? '');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit Supplier'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: namaController,
-              decoration: InputDecoration(labelText: 'Nama Supplier'),
-            ),
-            TextField(
-              controller: kontakController,
-              decoration: InputDecoration(labelText: 'Kontak'),
-            ),
-            TextField(
-              controller: alamatController,
-              decoration: InputDecoration(labelText: 'Alamat'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (namaController.text.isNotEmpty) {
-                final updatedSupplier = Supplier(
-                  idSuplier: supplier.idSuplier,
-                  namaSuplier: namaController.text,
-                  kontak: kontakController.text.isEmpty ? null : kontakController.text,
-                  alamat: alamatController.text.isEmpty ? null : alamatController.text,
-                );
-                await _dbHelper.updateSupplier(updatedSupplier);
-                Navigator.pop(context);
-                _loadData();
-              }
-            },
-            child: Text('Simpan'),
-          ),
-        ],
-      ),
-    );
+    _showSupplierDialog(supplier: supplier);
   }
 
   void _deleteSupplier(Supplier supplier) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Hapus Supplier'),
-        content: Text('Apakah yakin ingin menghapus ${supplier.namaSuplier}?'),
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Hapus Supplier'),
+          ],
+        ),
+        content: Text('Hapus supplier "${supplier.namaSuplier}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Batal'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () async {
-              await _dbHelper.deleteSupplier(supplier.idSuplier!);
-              Navigator.pop(context);
-              _loadData();
+              try {
+                await _dbHelper.deleteSupplier(supplier.idSuplier!);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Supplier berhasil dihapus'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                _loadData();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Gagal menghapus supplier: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: Text('Hapus'),
           ),
         ],
@@ -429,10 +661,16 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
     );
   }
 
-  void _addPembelian() {
-    // Placeholder - implementasi nanti
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Fitur tambah pembelian segera hadir')),
+  void _showPembelianDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => TambahPembelianDialog(
+        suppliers: _suppliers,
+        products: _products,
+        onSave: () {
+          _loadData();
+        },
+      ),
     );
   }
 
@@ -440,8 +678,8 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Konfirmasi'),
-        content: Text('Tandai sebagai sudah dibayar?'),
+        title: Text('Konfirmasi Pembayaran'),
+        content: Text('Tandai pembelian ini sebagai sudah dibayar?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -449,11 +687,27 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
           ),
           ElevatedButton(
             onPressed: () async {
-              await _dbHelper.updateStatusPembayaran(idPembelian, 'lunas');
-              Navigator.pop(context);
-              _loadData();
+              try {
+                await _dbHelper.updateStatusPembayaran(idPembelian, 'lunas');
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Status pembayaran berhasil diperbarui'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                _loadData();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Gagal memperbarui status: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
-            child: Text('Ya'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: Text('Ya, Sudah Bayar'),
           ),
         ],
       ),
@@ -461,6 +715,7 @@ class _SupplierScreenState extends State<SupplierScreen> with SingleTickerProvid
   }
 }
 
+// Dialog Pembelian tetap sama seperti kode sebelumnya
 class TambahPembelianDialog extends StatefulWidget {
   final List<Supplier> suppliers;
   final List<Product> products;
@@ -500,7 +755,7 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
             Container(
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green,
+                color: Colors.deepOrange,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(8),
                   topRight: Radius.circular(8),
@@ -510,15 +765,16 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
                 children: [
                   Icon(Icons.add_shopping_cart, color: Colors.white),
                   SizedBox(width: 12),
-                  Text(
-                    'Tambah Pembelian dari Supplier',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      'Tambah Pembelian dari Supplier',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  Spacer(),
                   IconButton(
                     icon: Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.pop(context),
@@ -638,7 +894,7 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
                           icon: Icon(Icons.add, size: 18),
                           label: Text('Tambah Item'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: Colors.deepOrange,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -693,9 +949,9 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
                       Container(
                         padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.green[50],
+                          color: Colors.deepOrange.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green[200]!),
+                          border: Border.all(color: Colors.deepOrange.shade200),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -708,11 +964,11 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
                               ),
                             ),
                             Text(
-                              NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(_getTotalHarga()),
+                              NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(_getTotalHarga()),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
-                                color: Colors.green[800],
+                                color: Colors.deepOrange.shade800,
                               ),
                             ),
                           ],
@@ -742,7 +998,7 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _simpanPembelian,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: Colors.deepOrange,
                         foregroundColor: Colors.white,
                       ),
                       child: _isLoading
@@ -771,11 +1027,11 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
       margin: EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.green[100],
+          backgroundColor: Colors.deepOrange.shade100,
           child: Text(
             '${item.jumlah}',
             style: TextStyle(
-              color: Colors.green[800],
+              color: Colors.deepOrange.shade800,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -787,9 +1043,9 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Harga: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.hargaBeli)}'),
+            Text('Harga: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(item.hargaBeli)}'),
             Text(
-              'Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ').format(item.subtotal)}',
+              'Subtotal: ${NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(item.subtotal)}',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
@@ -810,58 +1066,64 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
     Product? selectedProduct;
     int jumlah = 1;
     double hargaBeli = 0;
+    final jumlahController = TextEditingController(text: '1');
+    final hargaController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
           title: Text('Tambah Item'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<Product>(
-                value: selectedProduct,
-                decoration: InputDecoration(
-                  labelText: 'Pilih Produk *',
-                  border: OutlineInputBorder(),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<Product>(
+                  value: selectedProduct,
+                  decoration: InputDecoration(
+                    labelText: 'Pilih Produk *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.products.map((product) {
+                    return DropdownMenuItem(
+                      value: product,
+                      child: Text(product.namaProduk ?? 'Produk'),
+                    );
+                  }).toList(),
+                  onChanged: (product) {
+                    setStateDialog(() {
+                      selectedProduct = product;
+                      hargaBeli = product?.hargaEcer ?? 0;
+                      hargaController.text = hargaBeli.toString();
+                    });
+                  },
                 ),
-                items: widget.products.map((product) {
-                  return DropdownMenuItem(
-                    value: product,
-                    child: Text(product.namaProduk ?? 'Produk'),
-                  );
-                }).toList(),
-                onChanged: (product) {
-                  setStateDialog(() {
-                    selectedProduct = product;
-                    hargaBeli = product?.hargaEcer ?? 0; // Default ke harga ecer
-                  });
-                },
-              ),
-              SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Jumlah *',
-                  border: OutlineInputBorder(),
+                SizedBox(height: 16),
+                TextField(
+                  controller: jumlahController,
+                  decoration: InputDecoration(
+                    labelText: 'Jumlah *',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    jumlah = int.tryParse(value) ?? 1;
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                onChanged: (value) {
-                  jumlah = int.tryParse(value) ?? 1;
-                },
-              ),
-              SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Harga Beli *',
-                  border: OutlineInputBorder(),
+                SizedBox(height: 16),
+                TextField(
+                  controller: hargaController,
+                  decoration: InputDecoration(
+                    labelText: 'Harga Beli *',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    hargaBeli = double.tryParse(value) ?? 0;
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                controller: TextEditingController(text: hargaBeli.toString()),
-                onChanged: (value) {
-                  hargaBeli = double.tryParse(value) ?? 0;
-                },
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -885,6 +1147,7 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
                   );
                 }
               },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
               child: Text('Tambah'),
             ),
           ],
@@ -926,89 +1189,84 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
   }
 
   Future<void> _simpanPembelian() async {
-  if (_selectedSupplier == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Pilih supplier terlebih dahulu')),
-    );
-    return;
-  }
+    if (_selectedSupplier == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Pilih supplier terlebih dahulu')),
+      );
+      return;
+    }
 
-  if (_items.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Tambahkan minimal satu item')),
-    );
-    return;
-  }
+    if (_items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tambahkan minimal satu item')),
+      );
+      return;
+    }
 
-  setState(() {
-    _isLoading = true;
-  });
+    setState(() {
+      _isLoading = true;
+    });
 
-  try {
-    // Prepare data pembelian
-    final pembelianData = {
-      'id_suplier': _selectedSupplier!.idSuplier,
-      'tanggal_pembelian': _tanggalPembelian.toIso8601String(),
-      'total_harga': _getTotalHarga(),
-      'status_bayar': 'belum_bayar',
-      'tanggal_jatuh_tempo': _tanggalJatuhTempo.toIso8601String(),
-      'catatan': _catatan.isEmpty ? null : _catatan,
-      'created_at': DateTime.now().toIso8601String(),
-    };
+    try {
+      final pembelianData = {
+        'id_suplier': _selectedSupplier!.idSuplier,
+        'tanggal_pembelian': _tanggalPembelian.toIso8601String(),
+        'total_harga': _getTotalHarga(),
+        'status_bayar': 'belum_bayar',
+        'tanggal_jatuh_tempo': _tanggalJatuhTempo.toIso8601String(),
+        'catatan': _catatan.isEmpty ? null : _catatan,
+        'created_at': DateTime.now().toIso8601String(),
+      };
 
-    // Prepare detail items
-    final detailItems = _items.map((item) => {
-      'id_produk': item.product.idProduk,
-      'jumlah': item.jumlah,
-      'harga_beli': item.hargaBeli,
-      'subtotal': item.subtotal,
-    }).toList();
+      final detailItems = _items.map((item) => {
+        'id_produk': item.product.idProduk,
+        'jumlah': item.jumlah,
+        'harga_beli': item.hargaBeli,
+        'subtotal': item.subtotal,
+      }).toList();
 
-    print('💾 Saving pembelian dengan ${_items.length} items...');
-    
-    // Save dengan transaction-based method (lebih aman)
-    final idPembelian = await _dbHelper.savePembelianWithStockUpdate(
-      pembelianData, 
-      detailItems
-    );
-
-    if (idPembelian > 0) {
-      Navigator.pop(context);
-      widget.onSave();
+      print('💾 Saving pembelian dengan ${_items.length} items...');
       
-      // Show success message dengan detail
-      final totalItems = _items.fold(0, (sum, item) => sum + item.jumlah);
+      final idPembelian = await _dbHelper.savePembelianWithStockUpdate(
+        pembelianData, 
+        detailItems
+      );
+
+      if (idPembelian > 0) {
+        Navigator.pop(context);
+        widget.onSave();
+        
+        final totalItems = _items.fold(0, (sum, item) => sum + item.jumlah);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Pembelian berhasil! $totalItems item ditambahkan ke stok'
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        print('🎉 Pembelian berhasil disimpan dengan ID: $idPembelian');
+      } else {
+        throw Exception('Gagal menyimpan pembelian');
+      }
+    } catch (e) {
+      print('💥 Error saat simpan pembelian: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Pembelian berhasil! $totalItems item ditambahkan ke stok'
-          ),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
         ),
       );
-      
-      print('🎉 Pembelian berhasil disimpan dengan ID: $idPembelian');
-    } else {
-      throw Exception('Gagal menyimpan pembelian');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
-  } catch (e) {
-    print('💥 Error saat simpan pembelian: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
   }
 }
-}
 
-// Class untuk item pembelian
 class PembelianItem {
   final Product product;
   final int jumlah;

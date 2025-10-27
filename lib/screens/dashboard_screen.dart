@@ -63,27 +63,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        // title: const Text('Dashboard'),
-        // actions: [
-        //   IconButton(
-        //     icon: const Icon(Icons.notifications),
-        //     onPressed: () {
-        //       // TODO: Navigasi ke notifikasi
-        //     },
-        //   ),
-        // ],
-      ),
       floatingActionButton: FloatingActionButton.extended(
-  onPressed: () async {
-    await _dbHelper.generateBulkSampleData();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Sample data generated!')),
-    );
-  },
-  icon: Icon(Icons.data_usage),
-  label: Text('Generate Data'),
-), // Hapus setelah testing
+        onPressed: () async {
+          await _dbHelper.generateBulkSampleData();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Sample data generated!')),
+          );
+          _loadDashboardData(); // Refresh data setelah generate
+        },
+        icon: const Icon(Icons.data_usage),
+        label: const Text('Generate Data'),
+      ), // Hapus setelah testing
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -95,15 +85,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _MetricCard(
                   title: 'Penjualan Hari Ini',
                   value: _currencyFormat.format(_totalPenjualanHariIni),
-                  color: Colors.blue[100]!,
+                  color: Colors.blue.shade100,
                 ),
                 const SizedBox(width: 16),
                 _MetricCard(
                   title: 'Hutang Aktif',
                   value: _currencyFormat.format(_totalHutangAktif),
-                  color: Colors.orange[100]!,
+                  color: Colors.orange.shade100,
                 ),
               ],
+            ),
+            const SizedBox(height: 24),
+
+            // Quick Actions
+            const Text(
+              'Menu Cepat',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 100,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _QuickActionButton(
+                      icon: Icons.inventory,
+                      label: 'Produk',
+                      onTap: _navigateToProductScreen,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickActionButton(
+                      icon: Icons.shopping_cart,
+                      label: 'Transaksi',
+                      onTap: _navigateToTransactionScreen,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickActionButton(
+                      icon: Icons.receipt_long,
+                      label: 'Hutang',
+                      onTap: _navigateToDebtScreen,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickActionButton(
+                      icon: Icons.local_shipping,
+                      label: 'Supplier',
+                      onTap: _navigateToSupplierScreen,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -113,7 +149,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Expanded(child: _LowStockList(items: _lowStockProducts)),
+            Expanded(
+              child: _LowStockList(items: _lowStockProducts),
+            ),
           ],
         ),
       ),
@@ -199,8 +237,16 @@ class _LowStockList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const Center(
+        child: Text(
+          'Semua produk stoknya aman ✓',
+          style: TextStyle(color: Colors.grey, fontSize: 16),
+        ),
+      );
+    }
+    
     return ListView.builder(
-      physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final product = items[index];
@@ -211,7 +257,7 @@ class _LowStockList extends StatelessWidget {
             title: Text(product.namaProduk),
             trailing: Chip(
               label: Text('${product.stok}'),
-              backgroundColor: Colors.red[100],
+              backgroundColor: Colors.red.shade100,
             ),
           ),
         );
@@ -251,8 +297,6 @@ class _QuickActionButton extends StatelessWidget {
           ],
         ),
       ),
-      
     );
-    
   }
 }

@@ -234,7 +234,7 @@ class _MainScreenState extends State<MainScreen> {
               children: [
                 Icon(
                   widget.userRole == UserPermissions.PEMILIK 
-                      ? Icons.business_center 
+                      ? Icons.person 
                       : Icons.person,
                   size: 16,
                   color: Colors.white,

@@ -471,6 +471,15 @@ Future<int> savePembelianWithStockUpdate(
   }
 }
 
+Future<List<Debt>> getAllDebts() async {
+  final db = await database;
+  final List<Map<String, dynamic>> maps = await db.query(
+    tableHutang, // ✅ Pakai variable, bukan string 'debts'
+    orderBy: 'tanggal_jatuh_tempo ASC',
+  );
+  return List.generate(maps.length, (i) => Debt.fromMap(maps[i]));
+}
+
 
   // ========== TRANSACTION CRUD ==========
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pos/db/database_helper.dart';
 import 'package:pos/models/debt_model.dart';
+import 'package:intl/intl.dart';
 
 class HutangScreen extends StatefulWidget {
   const HutangScreen({super.key});
@@ -24,14 +25,17 @@ class _HutangScreenState extends State<HutangScreen> {
 
   Future<void> _loadHutang() async {
     try {
-      final debts = await _dbHelper.getUnpaidDebts(); // Ambil semua hutang yang belum lunas
+      final debts = await _dbHelper.getAllDebts(); // ✅ Ambil semua hutang
       setState(() {
         _hutangList = debts;
         _filteredHutangList = debts;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat hutang: $e')),
+        SnackBar(
+          content: Text('Gagal memuat hutang: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -60,28 +64,46 @@ class _HutangScreenState extends State<HutangScreen> {
     });
   }
 
-  Future<void> _deleteHutang(int id) async {
+  Future<void> _deleteHutang(int id, String status) async {
+    // ✅ Hutang lunas bisa dihapus sekarang!
     try {
-      await _dbHelper.deleteDebt(id); // Hapus hutang dari database
+      await _dbHelper.deleteDebt(id);
       setState(() {
         _hutangList.removeWhere((hutang) => hutang.idHutang == id);
         _filteredHutangList = _hutangList;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hutang berhasil dihapus')),
+        SnackBar(
+          content: Text('Hutang berhasil dihapus'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus hutang: $e')),
+        SnackBar(
+          content: Text('Gagal menghapus hutang: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
+  }
+
+  void _showHutangDialog({Debt? debt}) {
+    showDialog(
+      context: context,
+      builder: (context) => HutangFormDialog(
+        debt: debt,
+        onSaved: () {
+          _loadHutang();
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // title: const Text('Pencatatan Hutang'),
         backgroundColor: Colors.red,
         actions: [
           IconButton(
@@ -97,26 +119,21 @@ class _HutangScreenState extends State<HutangScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Tampilkan Lunas Saja:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                Switch(
-                  value: _showLunasOnly,
-                  onChanged: _toggleLunasOnly,
-                  activeColor: Colors.greenAccent,
-                  inactiveThumbColor: Colors.grey,
-                ),
-              ],
-            ),
-          ),
           Expanded(
             child: _filteredHutangList.isEmpty
-                ? const Center(child: Text('Tidak ada hutang'))
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.receipt_long_outlined, size: 80, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text(
+                          'Tidak ada hutang',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _filteredHutangList.length,
@@ -124,19 +141,8 @@ class _HutangScreenState extends State<HutangScreen> {
                       final hutang = _filteredHutangList[index];
                       return _HutangCard(
                         hutang: hutang,
-                        onDelete: () => _deleteHutang(hutang.idHutang!),
-                        onEdit: () async {
-                          final shouldRefresh = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => HutangFormScreen(debt: hutang),
-                            ),
-                          );
-                          if (shouldRefresh == true) {
-                            // Panggil ulang _loadHutang setelah selesai edit
-                            await _loadHutang();
-                          }
-                        },
+                        onDelete: () => _deleteHutang(hutang.idHutang!, hutang.status),
+                        onEdit: () => _showHutangDialog(debt: hutang),
                       );
                     },
                   ),
@@ -144,17 +150,8 @@ class _HutangScreenState extends State<HutangScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final shouldRefresh = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HutangFormScreen()),
-          );
-          if (shouldRefresh == true) {
-            await _loadHutang();
-          }
-        },
+        onPressed: () => _showHutangDialog(),
         backgroundColor: Colors.deepOrange,
-
         child: const Icon(Icons.add),
       ),
     );
@@ -164,38 +161,90 @@ class _HutangScreenState extends State<HutangScreen> {
 class _HutangCard extends StatelessWidget {
   final Debt hutang;
   final VoidCallback onDelete;
-  final VoidCallback onEdit;  // Tambahkan callback untuk edit
+  final VoidCallback onEdit;
 
   const _HutangCard({
     required this.hutang,
     required this.onDelete,
-    required this.onEdit,  // Tambahkan parameter ini
+    required this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
+    final currencyFormat = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
+    final isLunas = hutang.status == 'lunas';
+    
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
       elevation: 2,
-      color: hutang.status == 'lunas' ? Colors.green[50] : Colors.red[50],
+      color: isLunas ? Colors.green.shade50 : Colors.red.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isLunas ? Colors.green.shade200 : Colors.red.shade200,
+          width: 1.5,
+        ),
+      ),
       child: ListTile(
+        contentPadding: EdgeInsets.all(12),
+        leading: Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isLunas ? Colors.green.shade100 : Colors.red.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            isLunas ? Icons.check_circle : Icons.warning,
+            color: isLunas ? Colors.green.shade700 : Colors.red.shade700,
+            size: 28,
+          ),
+        ),
         title: Text(
           hutang.namaPelanggan,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Jumlah: Rp ${hutang.totalHutang.toStringAsFixed(2)}'),
-            if (hutang.tanggalJatuhTempo != null)
-              Text(
-                'Jatuh Tempo: ${hutang.tanggalJatuhTempo!.toLocal().toString().split(' ')[0]}',
-              ),
+            SizedBox(height: 4),
             Text(
-              'Status: ${hutang.status == 'lunas' ? 'Lunas' : 'Belum Lunas'}',
+              currencyFormat.format(hutang.totalHutang),
               style: TextStyle(
-                color: hutang.status == 'lunas' ? Colors.green : Colors.red,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            if (hutang.tanggalJatuhTempo != null) ...[
+              SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                  SizedBox(width: 4),
+                  Text(
+                    'Jatuh Tempo: ${DateFormat('dd/MM/yyyy').format(hutang.tanggalJatuhTempo!)}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ],
+            SizedBox(height: 6),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isLunas ? Colors.green : Colors.red,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                isLunas ? 'LUNAS' : 'BELUM LUNAS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -205,11 +254,43 @@ class _HutangCard extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: onEdit,  // Panggil fungsi onEdit ketika tombol edit ditekan
+              onPressed: onEdit,
             ),
             IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: onDelete,
+              icon: Icon(Icons.delete, color: Colors.red), // ✅ Selalu merah & aktif
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Row(
+                      children: [
+                        Icon(Icons.warning, color: Colors.orange),
+                        SizedBox(width: 8),
+                        Text('Hapus Hutang'),
+                      ],
+                    ),
+                    content: Text(
+                      isLunas 
+                        ? 'Hapus hutang yang sudah LUNAS atas nama "${hutang.namaPelanggan}"?\n\nData ini akan dihapus permanen.'
+                        : 'Hapus hutang atas nama "${hutang.namaPelanggan}"?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Batal'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          onDelete();
+                        },
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        child: const Text('Hapus'),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -255,10 +336,17 @@ class HutangSearchDelegate extends SearchDelegate {
       itemCount: results.length,
       itemBuilder: (context, index) {
         final hutang = results[index];
-        return _HutangCard(
-          hutang: hutang,
-          onDelete: () {}, // Handle delete if needed
-          onEdit: () {},   // Handle edit if needed
+        return ListTile(
+          title: Text(hutang.namaPelanggan),
+          subtitle: Text('Rp ${hutang.totalHutang.toStringAsFixed(0)}'),
+          trailing: Text(
+            hutang.status.toUpperCase(),
+            style: TextStyle(
+              color: hutang.status == 'lunas' ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          onTap: () => close(context, hutang),
         );
       },
     );
@@ -270,21 +358,28 @@ class HutangSearchDelegate extends SearchDelegate {
   }
 }
 
-class HutangFormScreen extends StatefulWidget {
+// Dialog Form untuk Hutang
+class HutangFormDialog extends StatefulWidget {
   final Debt? debt;
+  final VoidCallback onSaved;
 
-  const HutangFormScreen({super.key, this.debt});
+  const HutangFormDialog({
+    super.key,
+    this.debt,
+    required this.onSaved,
+  });
 
   @override
-  State<HutangFormScreen> createState() => _HutangFormScreenState();
+  State<HutangFormDialog> createState() => _HutangFormDialogState();
 }
 
-class _HutangFormScreenState extends State<HutangFormScreen> {
+class _HutangFormDialogState extends State<HutangFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _namaPelangganController = TextEditingController();
   final TextEditingController _totalHutangController = TextEditingController();
   final TextEditingController _tanggalJatuhTempoController = TextEditingController();
   String _status = 'belum lunas';
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -293,7 +388,9 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
       _namaPelangganController.text = widget.debt!.namaPelanggan;
       _totalHutangController.text = widget.debt!.totalHutang.toString();
       _tanggalJatuhTempoController.text =
-          widget.debt!.tanggalJatuhTempo?.toLocal().toString().split(' ')[0] ?? '';
+          widget.debt!.tanggalJatuhTempo != null
+              ? DateFormat('yyyy-MM-dd').format(widget.debt!.tanggalJatuhTempo!)
+              : '';
       _status = widget.debt!.status;
     }
   }
@@ -306,134 +403,60 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      _tanggalJatuhTempoController.text = picked.toLocal().toString().split(' ')[0];
+      _tanggalJatuhTempoController.text = DateFormat('yyyy-MM-dd').format(picked);
     }
   }
 
-  void _saveHutang() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final newDebt = Debt(
-          idHutang: widget.debt?.idHutang,
-          namaPelanggan: _namaPelangganController.text,
-          totalHutang: double.parse(_totalHutangController.text),
-          status: _status,
-          tanggalJatuhTempo: _tanggalJatuhTempoController.text.isNotEmpty
-              ? DateTime.parse(_tanggalJatuhTempoController.text)
-              : null,
-        );
+  Future<void> _saveHutang() async {
+    if (!_formKey.currentState!.validate()) return;
 
-        if (newDebt.idHutang == null) {
-          await DatabaseHelper().insertDebt(newDebt);
-        } else {
-          await DatabaseHelper().updateDebtStatus(newDebt.idHutang!, _status);
-        }
+    setState(() {
+      _isLoading = true;
+    });
 
-        Navigator.pop(context, true);  // Kembalikan nilai true untuk refresh
-      } catch (e) {
+    try {
+      final newDebt = Debt(
+        idHutang: widget.debt?.idHutang,
+        namaPelanggan: _namaPelangganController.text.trim(),
+        totalHutang: double.parse(_totalHutangController.text),
+        status: _status,
+        tanggalJatuhTempo: _tanggalJatuhTempoController.text.isNotEmpty
+            ? DateTime.parse(_tanggalJatuhTempoController.text)
+            : null,
+      );
+
+      if (newDebt.idHutang == null) {
+        await DatabaseHelper().insertDebt(newDebt);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menyimpan hutang: $e')),
+          SnackBar(
+            content: Text('Hutang berhasil ditambahkan'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        await DatabaseHelper().updateDebtStatus(newDebt.idHutang!, _status);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hutang berhasil diperbarui'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
-    }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.debt == null ? 'Tambah Hutang' : 'Edit Hutang'),
-        backgroundColor: Colors.teal,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _namaPelangganController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Pelanggan',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Nama pelanggan wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _totalHutangController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Total Hutang',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Total hutang wajib diisi';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Masukkan angka yang valid';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _tanggalJatuhTempoController,
-                decoration: const InputDecoration(
-                  labelText: 'Tanggal Jatuh Tempo',
-                  border: OutlineInputBorder(),
-                ),
-                readOnly: true,
-                onTap: () => _selectDate(context),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Tanggal jatuh tempo wajib diisi';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _status,
-                decoration: const InputDecoration(
-                  labelText: 'Status',
-                  border: OutlineInputBorder(),
-                ),
-                items: ['belum lunas', 'lunas']
-                    .map((status) => DropdownMenuItem(
-                          value: status,
-                          child: Text(status),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _status = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _saveHutang,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text(
-                  'SIMPAN HUTANG',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            ],
-          ),
+      widget.onSaved();
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan hutang: $e'),
+          backgroundColor: Colors.red,
         ),
-      ),
-    );
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -442,5 +465,204 @@ class _HutangFormScreenState extends State<HutangFormScreen> {
     _totalHutangController.dispose();
     _tanggalJatuhTempoController.dispose();
     super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.deepOrange,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.debt == null ? Icons.add_box : Icons.edit,
+                    color: Colors.white,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    widget.debt == null ? 'Tambah Hutang' : 'Edit Hutang',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Form
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: _namaPelangganController,
+                        decoration: InputDecoration(
+                          labelText: 'Nama Pelanggan',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Nama pelanggan wajib diisi';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: _totalHutangController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Total Hutang',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: Icon(Icons.attach_money),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Total hutang wajib diisi';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Masukkan angka yang valid';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: _tanggalJatuhTempoController,
+                        decoration: InputDecoration(
+                          labelText: 'Tanggal Jatuh Tempo',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: Icon(Icons.calendar_today),
+                        ),
+                        readOnly: true,
+                        onTap: () => _selectDate(context),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Tanggal jatuh tempo wajib diisi';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      DropdownButtonFormField<String>(
+                        value: _status,
+                        decoration: InputDecoration(
+                          labelText: 'Status',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: Icon(Icons.info),
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'belum lunas',
+                            child: Row(
+                              children: [
+                                Icon(Icons.warning, color: Colors.red, size: 18),
+                                SizedBox(width: 8),
+                                Text('Belum Lunas'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'lunas',
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                SizedBox(width: 8),
+                                Text('Lunas'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _status = value!;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Buttons
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text('Batal'),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _saveHutang,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepOrange,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              'Simpan',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
