@@ -25,7 +25,7 @@ class _HutangScreenState extends State<HutangScreen> {
 
   Future<void> _loadHutang() async {
     try {
-      final debts = await _dbHelper.getAllDebts(); // ✅ Ambil semua hutang
+      final debts = await _dbHelper.getAllDebts();
       setState(() {
         _hutangList = debts;
         _filteredHutangList = debts;
@@ -65,7 +65,6 @@ class _HutangScreenState extends State<HutangScreen> {
   }
 
   Future<void> _deleteHutang(int id, String status) async {
-    // ✅ Hutang lunas bisa dihapus sekarang!
     try {
       await _dbHelper.deleteDebt(id);
       setState(() {
@@ -175,7 +174,7 @@ class _HutangCard extends StatelessWidget {
     final isLunas = hutang.status == 'lunas';
     
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
       elevation: 2,
       color: isLunas ? Colors.green.shade50 : Colors.red.shade50,
       shape: RoundedRectangleBorder(
@@ -185,112 +184,135 @@ class _HutangCard extends StatelessWidget {
           width: 1.5,
         ),
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(12),
-        leading: Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isLunas ? Colors.green.shade100 : Colors.red.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            isLunas ? Icons.check_circle : Icons.warning,
-            color: isLunas ? Colors.green.shade700 : Colors.red.shade700,
-            size: 28,
-          ),
-        ),
-        title: Text(
-          hutang.namaPelanggan,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: Row(
           children: [
-            SizedBox(height: 4),
-            Text(
-              currencyFormat.format(hutang.totalHutang),
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-                color: Colors.grey.shade800,
+            // Leading Icon
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isLunas ? Colors.green.shade100 : Colors.red.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                isLunas ? Icons.check_circle : Icons.warning,
+                color: isLunas ? Colors.green.shade700 : Colors.red.shade700,
+                size: 26,
               ),
             ),
-            if (hutang.tanggalJatuhTempo != null) ...[
-              SizedBox(height: 4),
-              Row(
+            SizedBox(width: 10),
+            
+            // Content - Gunakan Expanded agar tidak overflow
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
-                  SizedBox(width: 4),
                   Text(
-                    'Jatuh Tempo: ${DateFormat('dd/MM/yyyy').format(hutang.tanggalJatuhTempo!)}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    hutang.namaPelanggan,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    currencyFormat.format(hutang.totalHutang),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: Colors.grey.shade800,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (hutang.tanggalJatuhTempo != null) ...[
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Jatuh Tempo: ${DateFormat('dd/MM/yyyy').format(hutang.tanggalJatuhTempo!)}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  SizedBox(height: 6),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isLunas ? Colors.green : Colors.red,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isLunas ? 'LUNAS' : 'BELUM LUNAS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ],
-            SizedBox(height: 6),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: isLunas ? Colors.green : Colors.red,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                isLunas ? 'LUNAS' : 'BELUM LUNAS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+            ),
+            
+            // Trailing Actions
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue, size: 22),
+                  onPressed: onEdit,
+                  padding: EdgeInsets.all(8),
+                  constraints: BoxConstraints(),
                 ),
-              ),
-            ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: onEdit,
-            ),
-            IconButton(
-              icon: Icon(Icons.delete, color: Colors.red), // ✅ Selalu merah & aktif
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Row(
-                      children: [
-                        Icon(Icons.warning, color: Colors.orange),
-                        SizedBox(width: 8),
-                        Text('Hapus Hutang'),
-                      ],
-                    ),
-                    content: Text(
-                      isLunas 
-                        ? 'Hapus hutang yang sudah LUNAS atas nama "${hutang.namaPelanggan}"?\n\nData ini akan dihapus permanen.'
-                        : 'Hapus hutang atas nama "${hutang.namaPelanggan}"?',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Batal'),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red, size: 22),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Row(
+                          children: [
+                            Icon(Icons.warning, color: Colors.orange),
+                            SizedBox(width: 8),
+                            Text('Hapus Hutang'),
+                          ],
+                        ),
+                        content: Text(
+                          isLunas 
+                            ? 'Hapus hutang yang sudah LUNAS atas nama "${hutang.namaPelanggan}"?\n\nData ini akan dihapus permanen.'
+                            : 'Hapus hutang atas nama "${hutang.namaPelanggan}"?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Batal'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              onDelete();
+                            },
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('Hapus'),
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          onDelete();
-                        },
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text('Hapus'),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
+                  padding: EdgeInsets.all(8),
+                  constraints: BoxConstraints(),
+                ),
+              ],
             ),
           ],
         ),
