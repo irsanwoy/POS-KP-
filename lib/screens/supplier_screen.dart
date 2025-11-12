@@ -891,7 +891,7 @@ class _TambahPembelianDialogState extends State<TambahPembelianDialog> {
                         ),
                         ElevatedButton.icon(
                           onPressed: () => _showTambahItemDialog(),
-                          icon: Icon(Icons.add, size: 18),
+                          icon: Icon(Icons.add, size: 15),
                           label: Text('Tambah Item'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.deepOrange,
